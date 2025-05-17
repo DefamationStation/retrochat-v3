@@ -32,20 +32,8 @@ class LLMClient:
         self.top_p = user_settings.get("TOP_P", self.default_params["TOP_P"])
         self.presence_penalty = user_settings.get("PRESENCE_PENALTY", self.default_params["PRESENCE_PENALTY"])
         self.frequency_penalty = user_settings.get("FREQUENCY_PENALTY", self.default_params["FREQUENCY_PENALTY"])
-        self.stop_sequences = user_settings.get("STOP_SEQUENCES", self.default_params["STOP_SEQUENCES"]).copy()
-
-        # Update default_params to reflect the actual initial state (after user settings)
-        # This is important if set_parameter compares against default_params later
-        self.default_params["MODEL_NAME"] = self.model
-        self.default_params["TEMPERATURE"] = self.temperature
-        self.default_params["MAX_TOKENS"] = self.max_tokens
-        self.default_params["STREAM"] = self.stream
-        self.default_params["SYSTEM_PROMPT"] = self.system_prompt
-        self.default_params["TOP_P"] = self.top_p
-        self.default_params["PRESENCE_PENALTY"] = self.presence_penalty
-        self.default_params["FREQUENCY_PENALTY"] = self.frequency_penalty
-        self.default_params["STOP_SEQUENCES"] = self.stop_sequences.copy()
-
+        # Ensure self.stop_sequences is a mutable copy distinct from the defaults or user_settings source.
+        self.stop_sequences = user_settings.get("STOP_SEQUENCES", self.default_params["STOP_SEQUENCES"][:]).copy()
 
     def _get_current_params_payload(self) -> Dict[str, Any]:
         """Helper to get payload-ready parameters, excluding None values for stop."""
