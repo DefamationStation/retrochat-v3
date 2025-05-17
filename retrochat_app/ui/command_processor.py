@@ -4,11 +4,12 @@ Handles command processing for the terminal UI.
 """
 import shlex
 import pyperclip
-# Assuming TerminalUI, LLMClient, SessionManager are complex types, 
+# Assuming TerminalUI, LLMClient, SessionManager are complex types,
 # using 'typing.Any' for simplicity or forward references if needed.
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .terminal_ui import TerminalUI # To avoid circular import at runtime
+    from .code_block_formatter import CodeBlockFormatter # For type hint if needed
 
 def process_command(ui: 'TerminalUI', command_input: str) -> bool:
     """
@@ -72,13 +73,24 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
         
         sub_command = args[0].lower()
         if sub_command == "reset":
-            ui.session_manager.clear_current_session_history()
+            ui.session_manager.clear_current_session_history() # This method should handle its own print confirmation
+            ui.code_block_formatter.reset() # Reset formatter
         elif sub_command == "new":
             new_session_id = args[1] if len(args) > 1 else None
             ui.session_manager.new_session(new_session_id)
+            ui.code_block_formatter.reset() # Reset formatter
+            ui.console.print(f"Started new session: {ui.session_manager.get_current_session_id()}")
         elif sub_command == "load":
             if len(args) > 1:
-                ui.session_manager.load_session(args[1])
+                session_to_load = args[1]
+                if ui.session_manager.load_session(session_to_load):
+                    ui.code_block_formatter.reset() # Reset formatter
+                    # ui.console.print(f"Session '{session_to_load}' loaded.") # load_session handles messages
+                    # When loading a session, we might want to re-process and display its history
+                    # For now, just resetting the formatter. Displaying history would require
+                    # iterating through loaded history and calling formatter.
+                # else:
+                    # ui.console.print(f"Failed to load session '{session_to_load}'.") # load_session handles messages
             else:
                 ui.console.print("Usage: /chat load <session_id>")
         elif sub_command == "list":
@@ -136,17 +148,22 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
     elif command == "/copy":
         if len(args) == 1:
             block_id_str = args[0]
-            code_content = ui.session_manager.get_code_block(block_id_str)
-            if code_content is not None:
-                try:
-                    pyperclip.copy(code_content)
-                    ui.console.print(f"Code block [cyan]CodeID {block_id_str}[/cyan] copied to clipboard.")
-                except pyperclip.PyperclipException as e:
-                    ui.console.print(f"[red]Error copying to clipboard: {e}. Make sure you have a copy/paste mechanism installed (e.g., xclip or xsel on Linux, or that your environment supports clipboard operations).[/red]")
-            else:
-                ui.console.print(f"[red]Code block with ID '{block_id_str}' not found in the current session.[/red]")
+            try:
+                block_id = int(block_id_str)
+                # Use CodeBlockFormatter to get the code
+                code_content = ui.code_block_formatter.get_code_by_id(block_id)
+                if code_content is not None:
+                    try:
+                        pyperclip.copy(code_content)
+                        ui.console.print(f"Code block [cyan]ID {block_id}[/cyan] copied to clipboard.")
+                    except pyperclip.PyperclipException as e:
+                        ui.console.print(f"[red]Error copying to clipboard: {e}. Make sure you have a copy/paste mechanism installed (e.g., xclip or xsel on Linux, or that your environment supports clipboard operations).[/red]")
+                else:
+                    ui.console.print(f"[red]Code block with ID '{block_id_str}' not found or not yet processed by the formatter for the current view.[/red]")
+            except ValueError:
+                ui.console.print(f"[red]Invalid Code Block ID: '{block_id_str}'. ID must be a number.[/red]")
         else:
-            ui.console.print("Usage: /copy <id>")
+            ui.console.print("Usage: /copy <CodeID>")
     elif command == "/exit" or command == "/quit":
         return True # Signal to exit
     else:
