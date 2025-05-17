@@ -3,18 +3,78 @@ import json
 import os
 import uuid
 from datetime import datetime
+import re # Added for code block processing
 
 from retrochat_app.core.config_manager import SESSIONS_DIR, LAST_SESSION_FILE
 
+# Helper function to process markdown for code blocks - can be outside class or static
+def _process_text_for_code_blocks(markdown_text: str, starting_id: int) -> tuple[str, dict[str, str], int]:
+    """
+    Finds code blocks, assigns unique string IDs, stores them, and embeds ID tags in the text.
+    The ID tag is placed on the same line as the opening fence.
+    Returns:
+        - processed_markdown: Markdown text with ID tags embedded.
+        - found_blocks: Dictionary of {block_id_str: code_content} for newly found blocks.
+        - next_id: The next available global ID.
+    """
+    found_blocks = {}
+    current_global_id = starting_id
+    
+    # Regex to find fenced code blocks (```optional_lang\\ncode\\n```
+    # Captures: group(1)=opening_fence (e.g., ```python\\n), group(2)=code_content, group(3)=closing_fence (e.g., \\n```
+    # Updated regex to be more tolerant of whitespace:
+    code_block_pattern = re.compile(
+        r"^(```\s*(?:[a-zA-Z0-9_\\-]*)\s*(?:\r\n|\n|\r))(.*?)((?:\r\n|\n|\r)```\s*)$", 
+        re.MULTILINE | re.DOTALL
+    )
+    
+    processed_text_parts = []
+    last_end = 0
+    
+    for match in code_block_pattern.finditer(markdown_text):
+        start_block, end_block = match.span()
+        opening_fence = match.group(1) # e.g., ```python\\n
+        code_content = match.group(2)  # The actual code
+        closing_fence = match.group(3) # e.g., \\n```
+
+        block_id_str = str(current_global_id)
+        found_blocks[block_id_str] = code_content
+        
+        # Add text before this code block
+        processed_text_parts.append(markdown_text[last_end:start_block])
+        
+        # Create the ID tag to be inserted
+        # Example: ```python [CodeID: 123]\\n
+        # Simplified ID tag for now:
+        id_tag_display = f" [CodeID: {block_id_str}]"
+        modified_opening_fence = opening_fence.rstrip('\r\n') + id_tag_display + '\n'
+        
+        processed_text_parts.append(modified_opening_fence)
+        processed_text_parts.append(code_content)
+        processed_text_parts.append(closing_fence)
+        
+        current_global_id += 1
+        last_end = end_block
+            
+    processed_text_parts.append(markdown_text[last_end:])
+    return "".join(processed_text_parts), found_blocks, current_global_id
+
 class SessionManager:
     """
-    Manages chat sessions, including loading, saving, and creating new sessions.
+    Manages chat sessions, including loading, saving, creating new sessions,
+    and handling persistent code block IDs.
     """
     def __init__(self):
         self.sessions_dir = SESSIONS_DIR
         self.last_session_file = LAST_SESSION_FILE
         self.current_session_id = None
-        self.current_session_data = {"conversation_history": [], "metadata": {}}
+        # Initialize with new fields for code blocks
+        self.current_session_data = {
+            "conversation_history": [],
+            "metadata": {},
+            "code_blocks": {}, # {global_id_str: code_content}
+            "next_code_block_global_id": 1
+        }
         os.makedirs(self.sessions_dir, exist_ok=True)
 
     def get_session_filepath(self, session_id: str) -> str:
@@ -54,6 +114,7 @@ class SessionManager:
     def load_session(self, session_id: str | None = None) -> bool:
         """
         Loads a session by ID. If no ID is provided, tries to load the last active session.
+        Initializes code block fields if loading an older session format.
         Returns True if a session was successfully loaded, False otherwise.
         """
         if session_id is None:
@@ -64,8 +125,22 @@ class SessionManager:
             if os.path.exists(filepath):
                 try:
                     with open(filepath, 'r') as f:
-                        self.current_session_data = json.load(f)
+                        loaded_data = json.load(f)
+                        self.current_session_data = loaded_data
                         self.current_session_id = session_id
+
+                        # Ensure new fields exist for backward compatibility
+                        if "code_blocks" not in self.current_session_data:
+                            self.current_session_data["code_blocks"] = {}
+                        if "next_code_block_global_id" not in self.current_session_data:
+                            # If loading an old session, we might need to re-process history
+                            # For simplicity now, just start new IDs. A more robust migration
+                            # would re-scan conversation_history.
+                            self.current_session_data["next_code_block_global_id"] = 1 
+                            # Potentially re-process existing history here if needed for old sessions
+                            # self._reprocess_history_for_code_blocks()
+
+
                         self._save_last_session_id() # Update last session on successful load
                         return True
                 except (IOError, json.JSONDecodeError) as e:
@@ -78,74 +153,108 @@ class SessionManager:
              self.new_session() # Start a new session if no previous one or load failed
         return False # No specific session loaded, new one started by new_session()
 
+    # Optional: Method to re-process history of old sessions if they are loaded
+    # def _reprocess_history_for_code_blocks(self):
+    #     all_new_blocks = {}
+    #     next_id = 1
+    #     processed_history = []
+    #     for msg in self.current_session_data.get("conversation_history", []):
+    #         if msg.get("role") == "assistant":
+    #             processed_content, new_blocks, next_id_after_msg = _process_text_for_code_blocks(msg["content"], next_id)
+    #             msg["content"] = processed_content
+    #             all_new_blocks.update(new_blocks)
+    #             next_id = next_id_after_msg
+    #         processed_history.append(msg)
+    #     self.current_session_data["conversation_history"] = processed_history
+    #     self.current_session_data["code_blocks"] = all_new_blocks
+    #     self.current_session_data["next_code_block_global_id"] = next_id
+
+
     def save_session(self):
-        """Saves the current session data to a file."""
+        """Saves the current session data (including code blocks) to a file."""
         if not self.current_session_id:
-            print("No active session to save.")
+            # print("No active session to save.") # Can be noisy
             return
 
         filepath = self.get_session_filepath(self.current_session_id)
         try:
-            # Update last modified timestamp
             self.current_session_data.setdefault("metadata", {})
             self.current_session_data["metadata"]["last_modified"] = datetime.now().isoformat()
 
             with open(filepath, 'w') as f:
                 json.dump(self.current_session_data, f, indent=4)
             self._save_last_session_id()
-            # print(f"Session '{self.current_session_id}' saved.") # Optional: for verbose logging
         except IOError as e:
             print(f"Error saving session {self.current_session_id} to {filepath}: {e}")
         except TypeError as e:
             print(f"Error serializing session data for {self.current_session_id}: {e}")
 
-
-    def new_session(self, session_id: str | None = None):
+    def new_session(self, session_id: str | None = None, session_name: str | None = None):
         """
-        Starts a new chat session. If session_id is provided, it uses that;
-        otherwise, it generates a new unique ID.
+        Starts a new session, optionally with a given ID and name.
+        Resets code block tracking.
         """
-        if session_id is None:
-            self.current_session_id = str(uuid.uuid4())
-        else:
-            self.current_session_id = session_id
+        # Save the old session first if one was active
+        if self.current_session_id:
+            self.save_session()
 
+        self.current_session_id = session_id if session_id else str(uuid.uuid4())
+        timestamp = datetime.now()
+        
+        # Reset session data for the new session
         self.current_session_data = {
             "conversation_history": [],
             "metadata": {
-                "created_at": datetime.now().isoformat(),
-                "session_id": self.current_session_id
-            }
+                "created_at": timestamp.isoformat(),
+                "name": session_name if session_name else f"Chat Session {timestamp.strftime('%Y-%m-%d %H:%M')}"
+            },
+            "code_blocks": {}, # Reset code blocks
+            "next_code_block_global_id": 1 # Reset ID counter
         }
-        self.save_session() # Save the new session immediately
+        print(f"Started new session: {self.current_session_data['metadata'].get('name', self.current_session_id)}")
+        self.save_session() # Save the newly created empty session
 
     def add_message_to_history(self, role: str, content: str):
-        """Adds a message to the current session's conversation history and saves the session."""
-        if not self.current_session_id:
-            print("No active session. Cannot add message.")
-            # Optionally, start a new session here if desired behavior
-            # self.new_session()
-            # print("Started a new session to add the message.")
-            return
-
-        self.current_session_data["conversation_history"].append({"role": role, "content": content})
+        """
+        Adds a message to the history. If it's an assistant message,
+        it processes the content for code blocks, assigns global IDs,
+        stores them, and embeds ID tags in the content.
+        """
+        if role == "assistant":
+            processed_content, new_blocks, next_id = _process_text_for_code_blocks(
+                content,
+                self.current_session_data.get("next_code_block_global_id", 1)
+            )
+            
+            self.current_session_data.setdefault("conversation_history", []).append({"role": role, "content": processed_content})
+            self.current_session_data.setdefault("code_blocks", {}).update(new_blocks)
+            self.current_session_data["next_code_block_global_id"] = next_id
+        else: # User messages or system messages (if you add them directly to history)
+            self.current_session_data.setdefault("conversation_history", []).append({"role": role, "content": content})
+        
+        # Auto-save after each message
         self.save_session()
+
+    def get_code_block(self, block_id_str: str) -> str | None:
+        """Retrieves code content by its global string ID."""
+        return self.current_session_data.get("code_blocks", {}).get(block_id_str)
 
     def get_conversation_history(self) -> list:
         """Returns the conversation history of the current session."""
         return self.current_session_data.get("conversation_history", [])
 
     def clear_current_session_history(self):
-        """Clears the conversation history of the current session and saves."""
+        """Clears the conversation history, code blocks, and resets code block ID counter for the current session."""
         if self.current_session_id:
             self.current_session_data["conversation_history"] = []
-            self.current_session_data["metadata"]["history_cleared_at"] = datetime.now().isoformat()
+            self.current_session_data["code_blocks"] = {}
+            self.current_session_data["next_code_block_global_id"] = 1
             self.save_session()
-            print(f"Conversation history for session '{self.current_session_id}' cleared.")
+            print(f"Conversation history cleared for session '{self.current_session_data['metadata'].get('name', self.current_session_id)}'.")
         else:
             print("No active session to clear.")
 
-    def list_sessions(self) -> list[dict]:
+    def list_sessions(self) -> list:
         """Lists all available sessions with their ID and last modified time."""
         sessions = []
         for filename in os.listdir(self.sessions_dir):

@@ -1,26 +1,11 @@
 {
-    "conversation_history": [
-        {
-            "role": "user",
-            "content": "hello"
-        },
-        {
-            "role": "assistant",
-            "content": "<think>\n\n</think>\n\nHello! How can I assist you today? \ud83d\ude0a"
-        },
-        {
-            "role": "user",
-            "content": "give me a python code block"
-        },
-        {
-            "role": "assistant",
-            "content": "<think>\n\n</think>\n\nSure! Here's a simple Python code block that calculates the factorial of a number using recursion:\n\n```python\ndef factorial(n):\n    if n == 0:\n        return 1\n    else:\n        return n * factorial(n - 1)\n\n# Example usage:\nnumber = 5\nresult = factorial(number)\nprint(f\"The factorial of {number} is {result}\")\n```\n\nLet me know if you'd like a different example! \ud83d\ude0a"
-        }
-    ],
+    "conversation_history": [],
     "metadata": {
         "created_at": "2025-05-17T19:32:26.135988",
         "session_id": "e1f9780c-d224-46bb-9412-e97d6e4bf6bc",
-        "last_modified": "2025-05-17T21:59:17.825613",
-        "history_cleared_at": "2025-05-17T21:59:02.544476"
-    }
+        "last_modified": "2025-05-17T22:54:50.246818",
+        "history_cleared_at": "2025-05-17T22:11:35.558149"
+    },
+    "code_blocks": {},
+    "next_code_block_global_id": 1
 }
