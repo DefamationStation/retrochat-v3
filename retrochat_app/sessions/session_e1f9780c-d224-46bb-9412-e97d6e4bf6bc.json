@@ -1,11 +1,39 @@
 {
-    "conversation_history": [],
+    "conversation_history": [
+        {
+            "role": "user",
+            "content": "hello"
+        },
+        {
+            "role": "assistant",
+            "content": "<think>\n\n</think>\n\nHello! It's great to see you here. How can I assist you today? \ud83d\ude0a"
+        },
+        {
+            "role": "user",
+            "content": "one more"
+        },
+        {
+            "role": "assistant",
+            "content": "<think>\n\n</think>\n\nSure thing! What else would you like to talk about or need help with? \ud83d\ude0a"
+        },
+        {
+            "role": "user",
+            "content": "give me a code block with python"
+        },
+        {
+            "role": "assistant",
+            "content": "<think>\n\n</think>\n\nSure! Here's a simple Python code block that calculates the factorial of a number using recursion:\n\n```python [CodeID: 1]\ndef factorial(n):\n    if n == 0:\n        return 1\n    else:\n        return n * factorial(n - 1)\n\n# Example usage\nnumber = 5\nresult = factorial(number)\nprint(f\"The factorial of {number} is {result}\")\n```\n\n### Output:\n``` [CodeID: 2]\nThe factorial of 5 is 120\n```\n\nLet me know if you'd like a version using loops instead, or something more complex! \ud83d\ude0a"
+        }
+    ],
     "metadata": {
         "created_at": "2025-05-17T19:32:26.135988",
         "session_id": "e1f9780c-d224-46bb-9412-e97d6e4bf6bc",
-        "last_modified": "2025-05-17T22:54:50.246818",
+        "last_modified": "2025-05-17T23:42:42.278885",
         "history_cleared_at": "2025-05-17T22:11:35.558149"
     },
-    "code_blocks": {},
-    "next_code_block_global_id": 1
+    "code_blocks": {
+        "1": "def factorial(n):\n    if n == 0:\n        return 1\n    else:\n        return n * factorial(n - 1)\n\n# Example usage\nnumber = 5\nresult = factorial(number)\nprint(f\"The factorial of {number} is {result}\")",
+        "2": "The factorial of 5 is 120"
+    },
+    "next_code_block_global_id": 3
 }

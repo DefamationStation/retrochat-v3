@@ -14,7 +14,7 @@ def main():
     llm_client = LLMClient()
     session_manager = SessionManager() # Instantiate SessionManager
     ui = TerminalUI(llm_client, session_manager) # Pass session_manager to TerminalUI
-    ui.start_chat()
+    ui.run() # Changed from ui.start_chat() to ui.run()
 
 if __name__ == "__main__":
     main()
