@@ -16,9 +16,6 @@ from .command_processor import process_command
 from .display_handler import render_message, log_error # Keep for user messages and simple system messages
 from .code_block_formatter import CodeBlockFormatter
 
-# Import logger setup
-from retrochat_app.utils import logger_setup # Added
-import logging # Added
 
 colorama.init(autoreset=True) # Initialize colorama with autoreset
 
@@ -27,26 +24,21 @@ class TerminalUI:
     Manages the chat interface in the terminal.
     """
     def __init__(self, llm_client: LLMClient, session_manager: SessionManager):
-        self.logger = logging.getLogger(__name__) # Added
         self.llm_client = llm_client
         self.session_manager = session_manager
         self.show_thoughts = False
         self.console = Console()
         # Pass the session_manager.current_session_data directly
         self.code_block_formatter = CodeBlockFormatter(self.session_manager.current_session_data)
-        self.logger.debug("TerminalUI initialized.") # Added
 
     def _display_loaded_history(self):
         """Displays the conversation history from the currently loaded session."""
-        self.logger.debug("Attempting to display loaded history.") # Added
         history = self.session_manager.get_conversation_history()
         if history:
-            self.console.print(Panel("[cyan]Resuming previous session...[/cyan]", expand=False))
-            self.logger.debug(f"Found {len(history)} messages in history.") # Added
-            for i, message in enumerate(history):
+            self.console.print("[cyan]Resuming previous session...[/cyan]")
+            for message in history:
                 role = message.get("role")
                 content = message.get("content")
-                self.logger.debug(f"Processing message {i+1}/{len(history)} - Role: {role}, Content (first 50): {content[:50] if content else 'None'}") # Added
                 if role and content:
                     # Mimic existing display logic for user and assistant messages
                     if role == "user":
@@ -64,10 +56,8 @@ class TerminalUI:
                                                      lambda m: colorama.Fore.LIGHTBLACK_EX + "Thinking: " + m.group(1).strip() + colorama.Style.RESET_ALL + " ",
                                                      content, flags=re.DOTALL)
                         
-                        self.logger.debug(f"Assistant message content for formatter (first 100): {display_content[:100]}") # Added
                         if display_content: # Ensure there's content to display
                             renderables = self.code_block_formatter.format_for_display(display_content)
-                            self.logger.debug(f"Formatter returned {len(renderables)} renderables for assistant message.") # Added
                             for renderable in renderables:
                                 if isinstance(renderable, Panel):  # Code blocks
                                     self.console.print(renderable)
@@ -78,14 +68,12 @@ class TerminalUI:
                                 else:
                                     # Apply yellow style to other content (Markdown, other Text)
                                     self.console.print(renderable, style="yellow")
-            self.console.print(Panel("[cyan]End of previous session.[/cyan]", expand=False))
+            self.console.print("[cyan]End of previous session.[/cyan]")
 
 
     def run(self):
-        self.logger.info("TerminalUI run method started.") # Added
         render_message(self.console, "system", "Welcome to RetroChat! Type /help for commands.")
         if self.session_manager.load_session(): # Returns True if a session was loaded
-            self.logger.info("Session loaded successfully.") # Added
             # CodeBlockFormatter is already initialized with current_session_data,
             # so no explicit load_from_session call is needed here.
             # We might need to re-initialize or update the formatter if session_data reference changes
@@ -94,7 +82,6 @@ class TerminalUI:
             self.code_block_formatter = CodeBlockFormatter(self.session_manager.current_session_data) # Re-initialize with potentially new session data
             self._display_loaded_history() 
         else:
-            self.logger.info("No existing session loaded or new session started.") # Added
             # If no session was loaded (e.g., first run or new session created by load_session implicitly)
             # ensure the formatter is using the (potentially new) session_data object.
             self.code_block_formatter = CodeBlockFormatter(self.session_manager.current_session_data)
