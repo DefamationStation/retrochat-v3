@@ -16,6 +16,9 @@ from .command_processor import process_command
 from .display_handler import render_message, log_error # Keep for user messages and simple system messages
 from .code_block_formatter import CodeBlockFormatter
 
+# Import logger setup
+from retrochat_app.utils import logger_setup # Added
+import logging # Added
 
 colorama.init(autoreset=True) # Initialize colorama with autoreset
 
@@ -24,16 +27,78 @@ class TerminalUI:
     Manages the chat interface in the terminal.
     """
     def __init__(self, llm_client: LLMClient, session_manager: SessionManager):
+        self.logger = logging.getLogger(__name__) # Added
         self.llm_client = llm_client
         self.session_manager = session_manager
         self.show_thoughts = False
         self.console = Console()
-        self.code_block_formatter = CodeBlockFormatter() # Initialize CodeBlockFormatter
+        # Pass the session_manager.current_session_data directly
+        self.code_block_formatter = CodeBlockFormatter(self.session_manager.current_session_data)
+        self.logger.debug("TerminalUI initialized.") # Added
+
+    def _display_loaded_history(self):
+        """Displays the conversation history from the currently loaded session."""
+        self.logger.debug("Attempting to display loaded history.") # Added
+        history = self.session_manager.get_conversation_history()
+        if history:
+            self.console.print(Panel("[cyan]Resuming previous session...[/cyan]", expand=False))
+            self.logger.debug(f"Found {len(history)} messages in history.") # Added
+            for i, message in enumerate(history):
+                role = message.get("role")
+                content = message.get("content")
+                self.logger.debug(f"Processing message {i+1}/{len(history)} - Role: {role}, Content (first 50): {content[:50] if content else 'None'}") # Added
+                if role and content:
+                    # Mimic existing display logic for user and assistant messages
+                    if role == "user":
+                        # User messages are typically simpler, directly rendered.
+                        render_message(self.console, "user", content)
+                    elif role == "assistant":
+                        # Assistant messages might contain code blocks and need formatting.
+                        display_content = content # Start with original content
+                        if not self.show_thoughts:
+                            # Remove .strip() from the end of this line
+                            display_content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+                        else:
+                            # Remove .strip() from the end of this line
+                            display_content = re.sub(r"<think>(.*?)</think>",
+                                                     lambda m: colorama.Fore.LIGHTBLACK_EX + "Thinking: " + m.group(1).strip() + colorama.Style.RESET_ALL + " ",
+                                                     content, flags=re.DOTALL)
+                        
+                        self.logger.debug(f"Assistant message content for formatter (first 100): {display_content[:100]}") # Added
+                        if display_content: # Ensure there's content to display
+                            renderables = self.code_block_formatter.format_for_display(display_content)
+                            self.logger.debug(f"Formatter returned {len(renderables)} renderables for assistant message.") # Added
+                            for renderable in renderables:
+                                if isinstance(renderable, Panel):  # Code blocks
+                                    self.console.print(renderable)
+                                elif isinstance(renderable, Text) and renderable.plain.startswith("CodeID"):
+                                    self.console.print(renderable)  # CodeID labels
+                                elif isinstance(renderable, Text) and renderable.plain == "\\n":
+                                    self.console.print(renderable) # Newlines for spacing
+                                else:
+                                    # Apply yellow style to other content (Markdown, other Text)
+                                    self.console.print(renderable, style="yellow")
+            self.console.print(Panel("[cyan]End of previous session.[/cyan]", expand=False))
+
 
     def run(self):
+        self.logger.info("TerminalUI run method started.") # Added
         render_message(self.console, "system", "Welcome to RetroChat! Type /help for commands.")
-        self.session_manager.load_session()
-        self.code_block_formatter.reset() # Reset formatter for the initial session
+        if self.session_manager.load_session(): # Returns True if a session was loaded
+            self.logger.info("Session loaded successfully.") # Added
+            # CodeBlockFormatter is already initialized with current_session_data,
+            # so no explicit load_from_session call is needed here.
+            # We might need to re-initialize or update the formatter if session_data reference changes
+            # or if load_session creates a new session_data object internally.
+            # For now, assuming session_manager.current_session_data is the single source of truth.
+            self.code_block_formatter = CodeBlockFormatter(self.session_manager.current_session_data) # Re-initialize with potentially new session data
+            self._display_loaded_history() 
+        else:
+            self.logger.info("No existing session loaded or new session started.") # Added
+            # If no session was loaded (e.g., first run or new session created by load_session implicitly)
+            # ensure the formatter is using the (potentially new) session_data object.
+            self.code_block_formatter = CodeBlockFormatter(self.session_manager.current_session_data)
+            self.code_block_formatter.reset() # Ensure a clean state for a new session
 
         while True:
             try:

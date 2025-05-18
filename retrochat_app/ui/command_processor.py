@@ -148,20 +148,25 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
     elif command == "/copy":
         if len(args) == 1:
             block_id_str = args[0]
-            try:
-                block_id = int(block_id_str)
-                # Use CodeBlockFormatter to get the code
-                code_content = ui.code_block_formatter.get_code_by_id(block_id)
-                if code_content is not None:
-                    try:
-                        pyperclip.copy(code_content)
-                        ui.console.print(f"Code block [cyan]ID {block_id}[/cyan] copied to clipboard.")
-                    except pyperclip.PyperclipException as e:
-                        ui.console.print(f"[red]Error copying to clipboard: {e}. Make sure you have a copy/paste mechanism installed (e.g., xclip or xsel on Linux, or that your environment supports clipboard operations).[/red]")
-                else:
-                    ui.console.print(f"[red]Code block with ID '{block_id_str}' not found or not yet processed by the formatter for the current view.[/red]")
-            except ValueError:
+            # We expect block_id_str to be a numeric string.
+            # CodeBlockFormatter.get_code_by_id expects a string.
+            # session_data["code_blocks"] keys are strings.
+            
+            # Validate if block_id_str is a number before passing, but pass as string.
+            if not block_id_str.isdigit():
                 ui.console.print(f"[red]Invalid Code Block ID: '{block_id_str}'. ID must be a number.[/red]")
+                return False # Keep as False, was missing before
+
+            code_content = ui.code_block_formatter.get_code_by_id(block_id_str) # Pass string ID
+            
+            if code_content is not None:
+                try:
+                    pyperclip.copy(code_content)
+                    ui.console.print(f"Code block [cyan]ID {block_id_str}[/cyan] copied to clipboard.")
+                except pyperclip.PyperclipException as e:
+                    ui.console.print(f"[red]Error copying to clipboard: {e}. Make sure you have a copy/paste mechanism installed (e.g., xclip or xsel on Linux, or that your environment supports clipboard operations).[/red]")
+            else:
+                ui.console.print(f"[red]Code block with ID '{block_id_str}' not found or not yet processed by the formatter for the current view.[/red]")
         else:
             ui.console.print("Usage: /copy <CodeID>")
     elif command == "/exit" or command == "/quit":
