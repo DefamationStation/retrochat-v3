@@ -98,22 +98,25 @@ class CodeBlockFormatter:
             if existing_code_id:
                 # An ID was present in the markdown. Use it.
                 block_id_to_use = existing_code_id
-                self.logger.info(f"Using existing CodeID '{existing_code_id}' from parsed markdown.")
-                # Ensure session_data["code_blocks"] has this content under this ID.
-                # This is crucial if the content in markdown could differ from stored.
-                # For now, assume _process_text_for_code_blocks correctly stored it.
-                # If not, we might need to update: self.session_data["code_blocks"][block_id_to_use] = code_content
+                self.logger.info(f"Using existing CodeID '{block_id_to_use}' from parsed markdown for content (first 30): {code_content[:30]}...")
                 
+                # CRUCIAL FIX: Store/update the code content for this ID.
+                # This ensures that if the markdown contains an ID (from history or LLM),
+                # the formatter's understanding of that ID's content is up-to-date with the
+                # (stripped) version of the code it just parsed from the input text.
+                self.session_data["code_blocks"][block_id_to_use] = code_content 
+                self.logger.debug(f"Stored/Updated code for ID '{block_id_to_use}' in session_data. Content (first 30): {code_content[:30]}...")
+
                 # Ensure next_code_block_global_id is at least past this ID
                 current_next_id = self.session_data.get("next_code_block_global_id", 1)
-                if int(existing_code_id) >= current_next_id:
-                    self.session_data["next_code_block_global_id"] = int(existing_code_id) + 1
-                    self.logger.debug(f"Updated next_code_block_global_id to {self.session_data['next_code_block_global_id']} due to existing_code_id {existing_code_id}")
+                if int(block_id_to_use) >= current_next_id:
+                    self.session_data["next_code_block_global_id"] = int(block_id_to_use) + 1
+                    self.logger.debug(f"Updated next_code_block_global_id to {self.session_data['next_code_block_global_id']} due to existing_code_id {block_id_to_use}")
             else:
                 # No CodeID in markdown (e.g., new block in current session, or old format without tags).
                 # Store it (if new) and get/generate an ID using the clean code_content.
                 self.logger.info(f"No existing CodeID found in markdown. Calling _store_and_get_id for content: {code_content[:30]}...")
-                block_id_to_use = self._store_and_get_id(code_content)
+                block_id_to_use = self._store_and_get_id(code_content) # This handles storing and ID generation
             
             panel = Panel(
                 Syntax(code_content, language, theme="dracula", line_numbers=True, word_wrap=True),
@@ -124,7 +127,6 @@ class CodeBlockFormatter:
             renderables.append(panel)
             # Display the CodeID (either existing or newly generated)
             renderables.append(Text(f"CodeID {block_id_to_use}", style="dim"))
-            renderables.append(Text("\\n")) # Add a newline for spacing after CodeID
             
             last_end = end
 

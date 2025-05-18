@@ -24,11 +24,12 @@ def main():
         ui.run() # Changed from ui.start_chat() to ui.run()
     except Exception as e:
         main_logger.exception("Unhandled exception in main:")
-        print(f"An unexpected error occurred in main: {e}") # Also print to console for visibility
+        # print(f"An unexpected error occurred in main: {e}") # Commented out console print
     finally:
         main_logger.info("Application shutting down...")
         logging.shutdown() # Ensure logs are flushed
-        print("[Main] Application shutdown sequence complete. Log flushing attempted.")
+        # print("[Main] Application shutdown sequence complete. Log flushing attempted.") # Commented out console print
+
 
 if __name__ == "__main__":
     # setup_logging() is called when logger_setup is imported
