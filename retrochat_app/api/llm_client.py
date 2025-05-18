@@ -71,48 +71,6 @@ class LLMClient:
             payload["stop"] = self.stop_sequences
         return payload
 
-    def send_chat_message(self, user_message: str, conversation_history: Optional[List[Dict[str, Any]]] = None):
-        """
-        Original method to send a chat message. 
-        Consider this for single-turn or if you prefer managing history outside before calling.
-        For continuous chat, use send_chat_message_full_history or stream_chat_message.
-        """
-        processed_messages = []
-        if self.system_prompt:
-            processed_messages.append({"role": "system", "content": self.system_prompt})
-
-        if conversation_history:
-            processed_messages.extend(conversation_history)
-        
-        processed_messages.append({"role": "user", "content": user_message})
-
-        payload = self._get_current_params_payload()
-        payload["messages"] = processed_messages
-
-        headers = {
-            "Content-Type": "application/json"
-        }
-
-        try:
-            response = requests.post(self.endpoint, headers=headers, data=json.dumps(payload))
-            response.raise_for_status()
-            response_data = response.json()
-            
-            if response_data.get("choices") and len(response_data["choices"]) > 0:
-                assistant_message = response_data["choices"][0].get("message", {}).get("content")
-                return assistant_message
-            else:
-                print("Error: No response choices found in API reply.")
-                print("Full response:", response_data)
-                return None
-        except requests.exceptions.RequestException as e:
-            print(f"Error connecting to LM Studio: {e}")
-            return None
-        except json.JSONDecodeError:
-            print("Error: Could not decode JSON response from API.")
-            print("Raw response:", response.text)
-            return None
-
     def send_chat_message_full_history(self, messages: List[Dict[str, Any]]) -> Optional[str]:
         """Sends a chat request with the complete message history (non-streaming)."""
         if not messages:
@@ -162,22 +120,7 @@ class LLMClient:
             response = requests.post(self.endpoint, headers=headers, data=json.dumps(payload), stream=True)
             response.raise_for_status()
             client = None # Placeholder for SSEClient if we use it
-            # Check for SSE content type if your server explicitly sets it for streams
-            # if 'text/event-stream' in response.headers.get("Content-Type", ""):
-            #    client = SSEClient(response) # Requires sseclient-py library
-            #    for event in client:
-            #        if event.data:
-            #            try:
-            #                chunk_data = json.loads(event.data)
-            #                if chunk_data.get("choices") and len(chunk_data["choices"]) > 0:
-            #                    delta = chunk_data["choices"][0].get("delta", {}).get("content")
-            #                    if delta:
-            #                        yield delta
-            #            except json.JSONDecodeError:
-            #                # print(f"Non-JSON data in stream: {event.data}") # Optional: log non-JSON data
-            #                pass # Ignore non-JSON parts like [DONE]
-            # else:
-                # Manual chunk processing if not using SSEClient or server sends raw chunks
+            # Manual chunk processing if not using SSEClient or server sends raw chunks
             for line in response.iter_lines():
                 if line:
                     decoded_line = line.decode('utf-8')
@@ -192,7 +135,6 @@ class LLMClient:
                                 if delta:
                                     yield delta
                         except json.JSONDecodeError:
-                            # print(f"Skipping non-JSON line: {decoded_line}") # For debugging
                             pass # Ignore lines that are not valid JSON
 
         except requests.exceptions.RequestException as e:
@@ -267,16 +209,3 @@ class LLMClient:
                 val = val.copy() if isinstance(val, list) else val
             params[key] = val
         return params
-
-# Example usage (for testing this module directly)
-if __name__ == '__main__':
-    client = LLMClient()
-    history = [
-        {"role": "user", "content": "What is the capital of France?"},
-        {"role": "assistant", "content": "The capital of France is Paris."}
-    ]
-    user_input = "And what is its population?"
-    print(f"User: {user_input}")
-    response = client.send_chat_message(user_input, conversation_history=history)
-    if response:
-        print(f"LLM: {response}")

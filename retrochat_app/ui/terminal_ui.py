@@ -98,9 +98,6 @@ class TerminalUI:
                         display_content = re.sub(r"<think>.*?</think>", "", assistant_response_content, flags=re.DOTALL).strip()
                 
                 if display_content:
-                    # if not is_stream: 
-                    #      self.console.print("Assistant: ", end="")
-                    
                     renderables = self.code_block_formatter.format_for_display(display_content)
                     for renderable in renderables:
                         if isinstance(renderable, Panel):  # Code blocks
