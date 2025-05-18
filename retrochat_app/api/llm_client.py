@@ -48,6 +48,11 @@ class LLMClient:
             if key in user_settings:
                 val = user_settings[key]
                 if attr == "stop_sequences":
+                    # Ensure stop_sequences is a list, making a copy or converting as necessary.
+                    # If user_settings provides a list, it's copied.
+                    # If it's a tuple or other iterable, it's converted to a list.
+                    # If it's None or an empty string, or other falsy value, it becomes an empty list.
+                    # If it's a non-list, truthy value (e.g. a string "stop"), it's converted to list of chars (e.g. ['s','t','o','p']).
                     val = val.copy() if isinstance(val, list) else list(val) if val else []
                 setattr(self, attr, val)
 

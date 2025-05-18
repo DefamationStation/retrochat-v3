@@ -3,6 +3,8 @@ Configuration for the LM Studio Chat Application.
 """
 import json
 import os
+import platform
+import logging # Added import
 
 # --- Default Configuration ---
 # LM Studio API endpoint
@@ -19,17 +21,29 @@ stream = False # Streaming responses can be implemented later
 
 # System Prompt - set to None or a string
 system_prompt = "You are a helpful AI assistant."
-# system_prompt = None 
+# system_prompt = None
 
 # --- User Specific Configuration ---
-CONFIG_DIR = os.path.dirname(__file__)
-USER_SETTINGS_FILE = os.path.join(CONFIG_DIR, "user_settings.json")
+# Get the appropriate user-specific configuration directory
+if platform.system() == "Windows":
+    APP_CONFIG_DIR = os.path.join(os.getenv("APPDATA", ""), "Retrochat")
+else:
+    APP_CONFIG_DIR = os.path.join(os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "Retrochat")
+
+# Create the directory if it doesn't exist
+if not os.path.exists(APP_CONFIG_DIR):
+    os.makedirs(APP_CONFIG_DIR, exist_ok=True)
+
+USER_SETTINGS_FILE = os.path.join(APP_CONFIG_DIR, "user_settings.json")
 
 
 # --- Session Management ---
-# Ensure sessions are stored in a 'sessions' subdirectory next to the config directory (not above it)
-SESSIONS_DIR = os.path.join(os.path.dirname(__file__), "sessions")  # Path to store session files
-LAST_SESSION_FILE = os.path.join(CONFIG_DIR, ".last_session") # Stores the ID of the last active session
+# Ensure sessions are stored in a 'sessions' subdirectory within the user-specific config directory
+SESSIONS_DIR = os.path.join(APP_CONFIG_DIR, "sessions")  # Path to store session files
+if not os.path.exists(SESSIONS_DIR):
+    os.makedirs(SESSIONS_DIR, exist_ok=True)
+
+LAST_SESSION_FILE = os.path.join(APP_CONFIG_DIR, ".last_session") # Stores the ID of the last active session
 
 
 # Additional model parameters (standardized)
@@ -59,8 +73,9 @@ def load_user_settings() -> dict:
             with open(USER_SETTINGS_FILE, 'r') as f:
                 return json.load(f)
         except (IOError, json.JSONDecodeError) as e:
-            from retrochat_app.ui.display_handler import log_error, Console
-            log_error(Console(), f"Error loading user settings from {USER_SETTINGS_FILE}: {e}. Using defaults.")
+            # from retrochat_app.ui.display_handler import log_error, Console # Removed import
+            # log_error(Console(), f"Error loading user settings from {USER_SETTINGS_FILE}: {e}. Using defaults.") # Removed UI call
+            logging.error(f"Error loading user settings from {USER_SETTINGS_FILE}: {e}. Using defaults.") # Added logging
             return {} # Return empty if error, so defaults are used
     return {} # Return empty if file doesn't exist
 
@@ -70,5 +85,6 @@ def save_user_settings(settings: dict):
         with open(USER_SETTINGS_FILE, 'w') as f:
             json.dump(settings, f, indent=4)
     except IOError as e:
-        from retrochat_app.ui.display_handler import log_error, Console
-        log_error(Console(), f"Error saving user settings to {USER_SETTINGS_FILE}: {e}")
+        # from retrochat_app.ui.display_handler import log_error, Console # Removed import
+        # log_error(Console(), f"Error saving user settings to {USER_SETTINGS_FILE}: {e}") # Removed UI call
+        logging.error(f"Error saving user settings to {USER_SETTINGS_FILE}: {e}") # Added logging

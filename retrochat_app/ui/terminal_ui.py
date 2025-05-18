@@ -13,7 +13,7 @@ from retrochat_app.core.session_manager import SessionManager
 
 # Import the new handlers and formatter
 from .command_processor import process_command
-from .display_handler import render_message # Keep for user messages and simple system messages
+from .display_handler import render_message, log_error # Keep for user messages and simple system messages
 from .code_block_formatter import CodeBlockFormatter
 
 
@@ -117,4 +117,4 @@ class TerminalUI:
                         self.console.print(style="yellow") # Print with yellow style if nothing else rendered
 
             except Exception as e:
-                render_message(self.console, "system", f"Error during LLM communication: {e}", is_error=True, show_thoughts_flag=self.show_thoughts)
+                log_error(self.console, f"Error during LLM communication: {e}")
