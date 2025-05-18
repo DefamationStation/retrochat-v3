@@ -4,9 +4,10 @@ Handles display-related functionalities for the terminal UI.
 """
 from rich.console import Console
 from rich.markdown import Markdown
-# Assuming LLMClient might be needed for type hinting if passed directly,
-# but here it's part of ui_instance or passed as a separate object.
-# from retrochat_app.api.llm_client import LLMClient # For type hinting
+
+def log_error(console: Console, message: str):
+    """Centralized error logging for the UI."""
+    console.print(f"[red][ERROR][/red] {message}")
 
 def show_help(console: Console):
     """Prints the help message to the console."""
@@ -32,32 +33,33 @@ def show_help(console: Console):
     console.print("  /exit or /quit                 - Exit the chat.")
     console.print("-" * 30)
 
-def show_system_info(console: Console, llm_client): # llm_client is an instance of LLMClient
+def show_system_info(console: Console, llm_client):
     """Prints connection, model, system prompt, and custom parameters."""
-    console.print("\\n--- Connection & Model Information ---")
+    console.print("\n--- Connection & Model Information ---")
     console.print(f"  Endpoint: {llm_client.endpoint}")
     console.print(f"  Model: {llm_client.model}")
-    
+
     current_params = llm_client.get_all_parameters()
     default_params = llm_client.default_params
 
-    console.print("\\n--- System Prompt ---")
+    console.print("\n--- System Prompt ---")
     if current_params["system_prompt"]:
         console.print(f'  "{current_params["system_prompt"]}"')
     else:
         console.print("  Not set.")
 
-    console.print("\\n--- Custom Parameters (Non-Default) ---")
+    console.print("\n--- Custom Parameters (Non-Default) ---")
     has_custom_params = False
     for key, current_value in current_params.items():
-        if key == "system_prompt": continue
+        if key == "system_prompt":
+            continue
         if key in default_params and current_value != default_params[key]:
             console.print(f"  {key}: {current_value} (Default: {default_params[key]})")
             has_custom_params = True
-        elif key not in default_params and current_value is not None: 
+        elif key not in default_params and current_value is not None:
             console.print(f"  {key}: {current_value}")
             has_custom_params = True
-    
+
     if not has_custom_params:
         console.print("  All parameters are at their default values.")
     console.print("-" * 30)

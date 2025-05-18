@@ -1,9 +1,9 @@
-\
+
 import json
 import os
 import uuid
 from datetime import datetime
-import re # Added for code block processing
+import re
 
 from retrochat_app.core.config_manager import SESSIONS_DIR, LAST_SESSION_FILE
 
@@ -92,14 +92,16 @@ class SessionManager:
                 try:
                     os.remove(self.last_session_file)
                 except OSError as e:
-                    print(f"Error removing last session ID file: {e}")
+                    from retrochat_app.ui.display_handler import log_error, Console
+                    log_error(Console(), f"Error removing last session ID file: {e}")
             return
 
         try:
             with open(self.last_session_file, 'w') as f:
                 f.write(self.current_session_id)
         except IOError as e:
-            print(f"Error saving last session ID: {e}")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), f"Error saving last session ID: {e}")
 
     def _load_last_session_id(self) -> str | None:
         """Loads the ID of the last active session."""
@@ -108,7 +110,8 @@ class SessionManager:
                 with open(self.last_session_file, 'r') as f:
                     return f.read().strip()
             except IOError as e:
-                print(f"Error loading last session ID: {e}")
+                from retrochat_app.ui.display_handler import log_error, Console
+                log_error(Console(), f"Error loading last session ID: {e}")
         return None
 
     def load_session(self, session_id: str | None = None) -> bool:
@@ -144,7 +147,8 @@ class SessionManager:
                         self._save_last_session_id() # Update last session on successful load
                         return True
                 except (IOError, json.JSONDecodeError) as e:
-                    print(f"Error loading session {session_id} from {filepath}: {e}")
+                    from retrochat_app.ui.display_handler import log_error, Console
+                    log_error(Console(), f"Error loading session {session_id} from {filepath}: {e}")
                     # If loading fails, start a new session
                     self.new_session(f"corrupted_session_recovery_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
                     return False # Indicate that the intended session wasn't loaded
@@ -185,9 +189,11 @@ class SessionManager:
                 json.dump(self.current_session_data, f, indent=4)
             self._save_last_session_id()
         except IOError as e:
-            print(f"Error saving session {self.current_session_id} to {filepath}: {e}")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), f"Error saving session {self.current_session_id} to {filepath}: {e}")
         except TypeError as e:
-            print(f"Error serializing session data for {self.current_session_id}: {e}")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), f"Error serializing session data for {self.current_session_id}: {e}")
 
     def new_session(self, session_id: str | None = None, session_name: str | None = None):
         """
@@ -211,7 +217,7 @@ class SessionManager:
             "code_blocks": {}, # Reset code blocks
             "next_code_block_global_id": 1 # Reset ID counter
         }
-        print(f"Started new session: {self.current_session_data['metadata'].get('name', self.current_session_id)}")
+        # Print handled by UI, not here
         self.save_session() # Save the newly created empty session
 
     def add_message_to_history(self, role: str, content: str):
@@ -250,9 +256,11 @@ class SessionManager:
             self.current_session_data["code_blocks"] = {}
             self.current_session_data["next_code_block_global_id"] = 1
             self.save_session()
-            print(f"Conversation history cleared for session '{self.current_session_data['metadata'].get('name', self.current_session_id)}'.")
+            from retrochat_app.ui.display_handler import log_error, Console
+            # Print handled by UI, not here
         else:
-            print("No active session to clear.")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), "No active session to clear.")
 
     def list_sessions(self) -> list:
         """Lists all available sessions with their ID and last modified time."""
@@ -274,7 +282,8 @@ class SessionManager:
                             "message_count": len(data.get("conversation_history", []))
                         })
                 except (IOError, json.JSONDecodeError) as e:
-                    print(f"Error reading session file {filename}: {e}")
+                    from retrochat_app.ui.display_handler import log_error, Console
+                    log_error(Console(), f"Error reading session file {filename}: {e}")
         # Sort sessions by last_modified time, most recent first
         sessions.sort(key=lambda s: s.get("last_modified", "0"), reverse=True)
         return sessions
@@ -285,7 +294,7 @@ class SessionManager:
         if os.path.exists(filepath):
             try:
                 os.remove(filepath)
-                print(f"Session '{session_id}' deleted.")
+                # Print handled by UI, not here
                 # If the deleted session was the last active one, clear the last_session_file
                 if self._load_last_session_id() == session_id:
                     if os.path.exists(self.last_session_file):
@@ -294,10 +303,12 @@ class SessionManager:
                     self.current_session_data = {"conversation_history": [], "metadata": {}}
                 return True
             except OSError as e:
-                print(f"Error deleting session file {filepath}: {e}")
+                from retrochat_app.ui.display_handler import log_error, Console
+                log_error(Console(), f"Error deleting session file {filepath}: {e}")
                 return False
         else:
-            print(f"Session '{session_id}' not found.")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), f"Session '{session_id}' not found.")
             return False
 
     def get_current_session_id(self) -> str | None:
@@ -314,22 +325,26 @@ class SessionManager:
         Returns True if successful, False otherwise.
         """
         if not old_session_id or not new_session_id:
-            print("Error: Both old and new session IDs must be provided for renaming.")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), "Error: Both old and new session IDs must be provided for renaming.")
             return False
         
         if old_session_id == new_session_id:
-            print("Error: New session name is the same as the old one.")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), "Error: New session name is the same as the old one.")
             return False
 
         old_filepath = self.get_session_filepath(old_session_id)
         new_filepath = self.get_session_filepath(new_session_id)
 
         if not os.path.exists(old_filepath):
-            print(f"Error: Session '{old_session_id}' not found.")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), f"Error: Session '{old_session_id}' not found.")
             return False
 
         if os.path.exists(new_filepath):
-            print(f"Error: A session with the name '{new_session_id}' already exists. Please choose a unique name.")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), f"Error: A session with the name '{new_session_id}' already exists. Please choose a unique name.")
             return False
 
         try:
@@ -373,12 +388,15 @@ class SessionManager:
 
             return True
         except (IOError, OSError, json.JSONDecodeError) as e:
-            print(f"Error renaming session '{old_session_id}' to '{new_session_id}': {e}")
+            from retrochat_app.ui.display_handler import log_error, Console
+            log_error(Console(), f"Error renaming session '{old_session_id}' to '{new_session_id}': {e}")
             # Attempt to clean up new file if old one still exists and new one was created
             if os.path.exists(new_filepath) and not os.path.exists(old_filepath):
                 try:
                     os.remove(new_filepath)
-                    print(f"Cleaned up partially created session file: {new_filepath}")
+                    from retrochat_app.ui.display_handler import log_error, Console
+                    log_error(Console(), f"Cleaned up partially created session file: {new_filepath}")
                 except OSError as cleanup_e:
-                    print(f"Error during cleanup of {new_filepath}: {cleanup_e}")
+                    from retrochat_app.ui.display_handler import log_error, Console
+                    log_error(Console(), f"Error during cleanup of {new_filepath}: {cleanup_e}")
             return False

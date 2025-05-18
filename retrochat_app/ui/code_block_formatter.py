@@ -1,5 +1,4 @@
-\
-# filepath: c:\\Users\\frenz\\Documents\\scripts\\Retrochat-v3\\retrochat_app\\ui\\code_block_formatter.py
+
 import re
 from rich.syntax import Syntax
 from rich.panel import Panel
@@ -77,4 +76,3 @@ class CodeBlockFormatter:
             return self.code_blocks.get(int(block_id))
         except ValueError:
             return None
-

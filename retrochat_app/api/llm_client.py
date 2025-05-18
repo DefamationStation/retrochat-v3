@@ -14,26 +14,42 @@ class LLMClient:
     """
     A client for interacting with the LM Studio API.
     """
+    # Mapping between internal attribute names and user settings keys (all lowercase with underscores)
+    PARAM_KEY_MAP = {
+        "model": "model_name",
+        "temperature": "temperature",
+        "max_tokens": "max_tokens",
+        "stream": "stream",
+        "system_prompt": "system_prompt",
+        "top_p": "top_p",
+        "presence_penalty": "presence_penalty",
+        "frequency_penalty": "frequency_penalty",
+        "stop_sequences": "stop_sequences"
+    }
+
     def __init__(self):
         self.endpoint = CHAT_COMPLETIONS_ENDPOINT
-        
-        # Load default settings first
         self.default_params = get_default_settings()
-        
-        # Load user settings and override defaults
         user_settings = load_user_settings()
-        
-        # Initialize attributes from defaults, then update with user settings
-        self.model = user_settings.get("MODEL_NAME", self.default_params["MODEL_NAME"])
-        self.temperature = user_settings.get("TEMPERATURE", self.default_params["TEMPERATURE"])
-        self.max_tokens = user_settings.get("MAX_TOKENS", self.default_params["MAX_TOKENS"])
-        self.stream = user_settings.get("STREAM", self.default_params["STREAM"])
-        self.system_prompt = user_settings.get("SYSTEM_PROMPT", self.default_params["SYSTEM_PROMPT"])
-        self.top_p = user_settings.get("TOP_P", self.default_params["TOP_P"])
-        self.presence_penalty = user_settings.get("PRESENCE_PENALTY", self.default_params["PRESENCE_PENALTY"])
-        self.frequency_penalty = user_settings.get("FREQUENCY_PENALTY", self.default_params["FREQUENCY_PENALTY"])
-        # Ensure self.stop_sequences is a mutable copy distinct from the defaults or user_settings source.
-        self.stop_sequences = user_settings.get("STOP_SEQUENCES", self.default_params["STOP_SEQUENCES"][:]).copy()
+
+        # Explicitly define all attributes with default values first
+        self.model = self.default_params["model_name"]
+        self.temperature = self.default_params["temperature"]
+        self.max_tokens = self.default_params["max_tokens"]
+        self.stream = self.default_params["stream"]
+        self.system_prompt = self.default_params["system_prompt"]
+        self.top_p = self.default_params["top_p"]
+        self.presence_penalty = self.default_params["presence_penalty"]
+        self.frequency_penalty = self.default_params["frequency_penalty"]
+        self.stop_sequences = self.default_params["stop_sequences"].copy()
+
+        # Now override with user settings using the mapping
+        for attr, key in self.PARAM_KEY_MAP.items():
+            if key in user_settings:
+                val = user_settings[key]
+                if attr == "stop_sequences":
+                    val = val.copy() if isinstance(val, list) else list(val) if val else []
+                setattr(self, attr, val)
 
     def _get_current_params_payload(self) -> Dict[str, Any]:
         """Helper to get payload-ready parameters, excluding None values for stop."""
@@ -182,59 +198,42 @@ class LLMClient:
             yield f" Error: {e}"
 
     def set_parameter(self, param_name: str, value: Any) -> bool:
-        # Map attribute names to the keys used in settings files if they differ
-        # For example, if the attribute is self.model but in JSON it's MODEL_NAME
-        settings_key_map = {
-            "model": "MODEL_NAME",
-            "temperature": "TEMPERATURE",
-            "max_tokens": "MAX_TOKENS",
-            "stream": "STREAM",
-            "system_prompt": "SYSTEM_PROMPT",
-            "top_p": "TOP_P",
-            "presence_penalty": "PRESENCE_PENALTY",
-            "frequency_penalty": "FREQUENCY_PENALTY",
-            "stop_sequences": "STOP_SEQUENCES"
-        }
+        attr = param_name
+        key = self.PARAM_KEY_MAP.get(attr, attr.upper())
 
-        # Determine the correct key for saving to user_settings.json
-        save_key = settings_key_map.get(param_name, param_name.upper()) # Default to uppercase if not in map
-
-        # Original validation and type conversion logic
-        if not hasattr(self, param_name):
+        if not hasattr(self, attr):
             print(f"Error: Parameter '{param_name}' cannot be set on the client.")
             return False
 
-        # Check against the keys in default_params for recognized configurable parameters
-        if param_name not in self.default_params:
-             print(f"Error: Parameter '{param_name}' is not a recognized configurable parameter.")
-             return False
-        
-        expected_type_source = self.default_params.get(param_name)
+        if key not in self.default_params:
+            print(f"Error: Parameter '{param_name}' is not a recognized configurable parameter.")
+            return False
+
+        expected_type_source = self.default_params.get(key)
 
         try:
-            current_actual_value = getattr(self, param_name)
+            current_actual_value = getattr(self, attr)
             if isinstance(current_actual_value, bool) and not isinstance(value, bool):
                 if str(value).lower() == 'true': value_to_set = True
                 elif str(value).lower() == 'false': value_to_set = False
                 else: raise ValueError("Boolean parameter must be True or False")
-            elif param_name == "stop_sequences":
+            elif attr == "stop_sequences":
                 if isinstance(value, str):
                     value_to_set = [seq.strip() for seq in value.split(',') if seq.strip()]
                 elif isinstance(value, list):
                     value_to_set = value
                 else: raise ValueError("stop_sequences must be a list or a comma-separated string.")
-            elif param_name == "system_prompt":
-                 value_to_set = str(value) if value is not None else None
+            elif attr == "system_prompt":
+                value_to_set = str(value) if value is not None else None
             else:
-                # Use the type of the value in default_params for conversion
-                value_to_set = type(self.default_params[param_name])(value)
-           
-            setattr(self, param_name, value_to_set)
+                value_to_set = type(self.default_params[key])(value)
+
+            setattr(self, attr, value_to_set)
             print(f"Parameter '{param_name}' set to: {value_to_set}")
 
             # Save the updated settings
-            user_settings = load_user_settings() # Load current to preserve other settings
-            user_settings[save_key] = value_to_set # Use the mapped key
+            user_settings = load_user_settings()
+            user_settings[key] = value_to_set
             save_user_settings(user_settings)
             return True
         except (ValueError, TypeError) as e:
@@ -248,23 +247,21 @@ class LLMClient:
             print(f'System prompt set to: "{prompt}"')
         else:
             print("System prompt cleared.")
-        # Save the updated system prompt
+        # Save the updated system prompt using the mapping
         user_settings = load_user_settings()
-        user_settings["SYSTEM_PROMPT"] = prompt
+        user_settings[self.PARAM_KEY_MAP["system_prompt"]] = prompt
         save_user_settings(user_settings)
 
     def get_all_parameters(self) -> Dict[str, Any]:
-        return {
-            "model": self.model,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "stream": self.stream,
-            "system_prompt": self.system_prompt,
-            "top_p": self.top_p,
-            "presence_penalty": self.presence_penalty,
-            "frequency_penalty": self.frequency_penalty,
-            "stop_sequences": self.stop_sequences.copy(),
-        }
+        # Return parameters using the user settings keys for consistency
+        params = {}
+        for attr, key in self.PARAM_KEY_MAP.items():
+            val = getattr(self, attr)
+            # Copy list for stop_sequences
+            if attr == "stop_sequences":
+                val = val.copy() if isinstance(val, list) else val
+            params[key] = val
+        return params
 
 # Example usage (for testing this module directly)
 if __name__ == '__main__':

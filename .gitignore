@@ -131,6 +131,9 @@ cython_debug/
 .DS_Store
 Thumbs.db
 
+# chat session files
+sessions/
+
 # If you have sensitive information in your config, consider ignoring it
 # and providing a template instead. For now, assuming config_manager.py is safe to commit.
 # retrochat_app/core/config_manager.py.template
