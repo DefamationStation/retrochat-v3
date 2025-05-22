@@ -58,6 +58,14 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
             elif key == "system_prompt": ui.console.print(f'  {key}: "{value}"')
             else: ui.console.print(f"  {key}: {value}")
         ui.console.print("-" * 30)
+    elif command == "/stream":
+        if len(args) == 1 and args[0].lower() in {"true", "false"}:
+            ui.llm_client.stream = args[0].lower() == "true"
+            state = "enabled" if ui.llm_client.stream else "disabled"
+            ui.console.print(f"[cyan]Token streaming {state}.[/cyan]")
+        else:
+            ui.console.print("[cyan]Usage: /stream true|false[/cyan]")
+        return False
     elif command == "/history":
         history = ui.session_manager.get_conversation_history()
         if not history: ui.console.print("Conversation history is empty for the current session.")

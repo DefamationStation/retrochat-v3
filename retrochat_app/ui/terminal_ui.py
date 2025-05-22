@@ -71,6 +71,40 @@ class TerminalUI:
             self.console.print("[cyan]End of previous session.[/cyan]")
 
 
+    # ──────────────────────────────────────────────────────────────
+    # New helper — prints each token as soon as it lands on stdout.
+    # Returns the full assistant response so callers can log it.
+    # ──────────────────────────────────────────────────────────────
+    def _stream_tokens(
+        self,
+        token_iterable,
+        *,
+        include_thoughts: bool = False,
+    ) -> str:
+        buffer: list[str] = []
+        with self.console.status("[yellow]Assistant is thinking...[/yellow]", spinner="dots") as status:
+            for chunk in token_iterable:
+                status.stop()                           # stop spinner on first byte
+
+                # ↓ Handle your special “thought” packets
+                if isinstance(chunk, dict) and chunk.get("type") == "thought":
+                    if include_thoughts:
+                        render_message(
+                            self.console,
+                            "system",
+                            chunk["content"],
+                            is_thought=True,
+                            show_thoughts_flag=True,
+                        )
+                    continue
+
+                # ↓ Normal token (string).  Print *and* collect it.
+                self.console.print(chunk, end="", highlight=False, soft_wrap=True)
+                buffer.append(chunk)
+
+        self.console.print()  # final newline
+        return "".join(buffer)
+
     def run(self):
         render_message(self.console, "system", "Welcome to RetroChat! Type /help for commands.")
         if self.session_manager.load_session(): # Returns True if a session was loaded
@@ -122,17 +156,10 @@ class TerminalUI:
                 assistant_response_content = ""
 
                 if is_stream:
-                    stream_buffer = ""
-                    with self.console.status("[yellow]Assistant is thinking...[/yellow]", spinner="dots") as status:
-                        for chunk in self.llm_client.stream_chat_message(api_messages):
-                            status.stop() # Stop spinner once first chunk arrives
-                            if isinstance(chunk, dict) and chunk.get('type') == 'thought':
-                                if self.show_thoughts:
-                                    render_message(self.console, "system", chunk['content'], is_thought=True, show_thoughts_flag=self.show_thoughts)
-                            elif isinstance(chunk, str):
-                                assistant_response_content += chunk
-                                self.console.print(chunk, end="") 
-                        self.console.print()
+                    assistant_response_content = self._stream_tokens(
+                        self.llm_client.stream_chat_message(api_messages),
+                        include_thoughts=self.show_thoughts,
+                    )
                 else: # Non-streaming
                     with self.console.status("[yellow]Assistant is thinking...[/yellow]", spinner="dots") as status:
                         raw_llm_response = self.llm_client.send_chat_message_full_history(api_messages)
