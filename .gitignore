@@ -132,7 +132,7 @@ cython_debug/
 Thumbs.db
 
 # chat session files
-sessions/
+retrochat_app/sessions/
 
 # If you have sensitive information in your config, consider ignoring it
 # and providing a template instead. For now, assuming config_manager.py is safe to commit.
