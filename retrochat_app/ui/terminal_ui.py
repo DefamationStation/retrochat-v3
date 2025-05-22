@@ -9,6 +9,7 @@ from rich.panel import Panel
 
 from retrochat_app.api.llm_client import LLMClient
 from retrochat_app.core.session_manager import SessionManager
+from retrochat_app.core.text_processing_utils import process_token_stream
 
 # Import the new handlers and formatter
 from .command_processor import process_command
@@ -83,70 +84,42 @@ class TerminalUI:
     # Strips *leading* blank lines/spaces before the first visible char.
     # ──────────────────────────────────────────────────────────────────────
     def _stream_tokens(self, token_iterable, *, include_thoughts=False) -> str:
-        tag_open, tag_close = "<think>", "</think>"
-        in_think = False
-        stash = ""
-        full: list[str] = []
-        out_started = False  # have we printed a visible char yet?
-
-        def _emit(text: str) -> None:
-            nonlocal out_started
-            if not out_started:
-                text = text.lstrip(" \t\r\n")  # <- trim leading blanks once
-                if not text:
-                    return
-            self.console.print(text, style="yellow", end="", highlight=False, soft_wrap=True)
-            out_started = True
+        full_response_content: list[str] = []
 
         with self.console.status(
             "[yellow]Assistant is thinking...[/yellow]", spinner="dots"
         ) as status:
-            for chunk in token_iterable:
-                status.stop()
+            for processed_chunk in process_token_stream(
+                token_iterable, include_thoughts=include_thoughts
+            ):
+                status.stop()  # Stop spinner as soon as first processed chunk is ready
 
-                # out-of-band “thought” packets
-                if isinstance(chunk, dict) and chunk.get("type") == "thought":
-                    if include_thoughts:
-                        render_message(
-                            self.console,
-                            "system",
-                            chunk["content"],
-                            is_thought=True,
-                            show_thoughts_flag=True,
-                        )
-                    continue
-
-                if not isinstance(chunk, str):
-                    continue
-
-                full.append(chunk)
-                if include_thoughts:
-                    _emit(chunk)
-                    continue
-
-                # strip inline <think>…</think>
-                stash += chunk
-                while stash:
-                    if not in_think:
-                        start = stash.find(tag_open)
-                        if start == -1:
-                            _emit(stash)
-                            stash = ""
-                        else:
-                            if start:
-                                _emit(stash[:start])
-                            stash = stash[start + len(tag_open) :]
-                            in_think = True
-                    else:
-                        end = stash.find(tag_close)
-                        if end == -1:
-                            stash = ""  # still inside think: drop everything so far
-                        else:
-                            stash = stash[end + len(tag_close) :]
-                            in_think = False
+                if processed_chunk["type"] == "text":
+                    self.console.print(
+                        processed_chunk["content"],
+                        style="yellow",
+                        end="",
+                        highlight=False,
+                        soft_wrap=True,
+                    )
+                    full_response_content.append(processed_chunk["content"])
+                elif processed_chunk["type"] == "thought":
+                    # This part assumes render_message can handle thought display
+                    # based on the previous logic in _stream_tokens.
+                    # If include_thoughts is true, process_token_stream yields these.
+                    render_message(
+                        self.console,
+                        "system",
+                        processed_chunk["content"],
+                        is_thought=True,
+                        show_thoughts_flag=True,  # Ensure this flag is correctly used by render_message
+                    )
+                    # Optionally, add thought content to full_response if needed for history,
+                    # though typically thoughts are not part of the main response content.
+                    # For now, let's assume thoughts are for display only during streaming.
 
         self.console.print()  # final newline
-        return "".join(full)
+        return "".join(full_response_content)
 
     # ──────────────────────────────────────────────────────────────────────
     # Main loop
