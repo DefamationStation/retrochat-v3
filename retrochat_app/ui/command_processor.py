@@ -60,9 +60,7 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
         ui.console.print("-" * 30)
     elif command == "/stream":
         if len(args) == 1 and args[0].lower() in {"true", "false"}:
-            ui.llm_client.stream = args[0].lower() == "true"
-            state = "enabled" if ui.llm_client.stream else "disabled"
-            ui.console.print(f"[cyan]Token streaming {state}.[/cyan]")
+            ui.llm_client.set_parameter("stream", args[0].lower()) # Use set_parameter to save
         else:
             ui.console.print("[cyan]Usage: /stream true|false[/cyan]")
         return False
