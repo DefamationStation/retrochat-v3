@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any
 # Adjusted import path for config
 from retrochat_app.core.config_manager import (
     CHAT_COMPLETIONS_ENDPOINT, # Keep existing imports
+    API_BASE_URL, # Add API_BASE_URL import
     load_user_settings, save_user_settings, get_default_settings # Add new functions
 )
 
@@ -71,6 +72,14 @@ class LLMClient:
             payload["stop"] = self.stop_sequences
         return payload
 
+    def update_endpoint(self):
+        """Updates the endpoint from the global config."""
+        # Need to import CHAT_COMPLETIONS_ENDPOINT from config_manager again, 
+        # or ensure it's passed or accessible if it can change at runtime.
+        # For simplicity, assuming config_manager.CHAT_COMPLETIONS_ENDPOINT is updated globally.
+        from retrochat_app.core.config_manager import CHAT_COMPLETIONS_ENDPOINT as current_chat_endpoint
+        self.endpoint = current_chat_endpoint
+
     def send_chat_message_full_history(self, messages: List[Dict[str, Any]]) -> Optional[str]:
         """Sends a chat request with the complete message history (non-streaming)."""
         if not messages:
@@ -103,8 +112,8 @@ class LLMClient:
             print("Raw response:", response.text)
             return None
 
-    def stream_chat_message(self, messages: List[Dict[str, Any]]):
-        """Sends a chat request with the complete message history (streaming)."""
+    def send_chat_message_streaming(self, messages: List[Dict[str, Any]], console) -> Optional[str]:
+        """Sends a chat request and handles streaming response."""
         if not messages:
             print("Error: Message list cannot be empty.")
             yield "Error: Message list cannot be empty." # Yield error message
@@ -112,10 +121,12 @@ class LLMClient:
 
         payload = self._get_current_params_payload()
         payload["messages"] = messages # Use the provided full history
+        stream_flag = payload["stream"] # Get current stream setting
         payload["stream"] = True # Ensure stream is True for this method
 
         headers = {"Content-Type": "application/json"}
 
+        full_response_content = "" # To accumulate the full response content
         try:
             response = requests.post(self.endpoint, headers=headers, data=json.dumps(payload), stream=True)
             response.raise_for_status()
@@ -134,6 +145,7 @@ class LLMClient:
                                 delta = chunk_data["choices"][0].get("delta", {}).get("content")
                                 if delta:
                                     yield delta
+                                    full_response_content += delta # Accumulate the delta
                         except json.JSONDecodeError:
                             pass # Ignore lines that are not valid JSON
 
@@ -143,8 +155,27 @@ class LLMClient:
         except Exception as e:
             print(f"An unexpected error occurred during streaming: {e}")
             yield f" Error: {e}"
+        finally:
+            self.stream = stream_flag # Restore original stream setting
+        return full_response_content
+    
+    def get_all_parameters(self) -> Dict[str, Any]:
+        """Returns a dictionary of all current model parameters."""
+        return {
+            self.PARAM_KEY_MAP["model"]: self.model,
+            self.PARAM_KEY_MAP["temperature"]: self.temperature,
+            self.PARAM_KEY_MAP["max_tokens"]: self.max_tokens,
+            self.PARAM_KEY_MAP["stream"]: self.stream,
+            self.PARAM_KEY_MAP["system_prompt"]: self.system_prompt,
+            self.PARAM_KEY_MAP["top_p"]: self.top_p,
+            self.PARAM_KEY_MAP["presence_penalty"]: self.presence_penalty,
+            self.PARAM_KEY_MAP["frequency_penalty"]: self.frequency_penalty,
+            self.PARAM_KEY_MAP["stop_sequences"]: self.stop_sequences.copy(),
+            "api_base_url": API_BASE_URL # Add api_base_url to the parameters
+        }
 
-    def set_parameter(self, param_name: str, value: Any) -> bool:
+    def set_parameter(self, param_name: str, value: Any):
+        """Sets a model parameter and saves it to user settings."""
         attr = param_name
         key = self.PARAM_KEY_MAP.get(attr, attr.upper())
 
@@ -178,34 +209,22 @@ class LLMClient:
             setattr(self, attr, value_to_set)
             print(f"Parameter '{param_name}' set to: {value_to_set}")
 
-            # Save the updated settings
-            user_settings = load_user_settings()
-            user_settings[key] = value_to_set
-            save_user_settings(user_settings)
-            return True
+            # Save all current settings (including the updated one)
+            current_settings = self.get_all_parameters() # Get all current params
+            save_user_settings(current_settings)
+            print(f"Parameter '{param_name}' set to '{value}'.")
         except (ValueError, TypeError) as e:
             expected_type_name = type(expected_type_source).__name__ if expected_type_source is not None else "unknown"
             print(f"Error setting parameter '{param_name}': Invalid value type. Expected compatible with {expected_type_name}. Got '{value}'. Details: {e}")
             return False
 
     def set_system_prompt(self, prompt: Optional[str]):
+        """Sets the system prompt and saves it."""
         self.system_prompt = prompt
+        current_settings = self.get_all_parameters()
+        current_settings[self.PARAM_KEY_MAP["system_prompt"]] = prompt
+        save_user_settings(current_settings)
         if prompt:
-            print(f'System prompt set to: "{prompt}"')
+            print(f"System prompt set to: '{prompt}'")
         else:
             print("System prompt cleared.")
-        # Save the updated system prompt using the mapping
-        user_settings = load_user_settings()
-        user_settings[self.PARAM_KEY_MAP["system_prompt"]] = prompt
-        save_user_settings(user_settings)
-
-    def get_all_parameters(self) -> Dict[str, Any]:
-        # Return parameters using the user settings keys for consistency
-        params = {}
-        for attr, key in self.PARAM_KEY_MAP.items():
-            val = getattr(self, attr)
-            # Copy list for stop_sequences
-            if attr == "stop_sequences":
-                val = val.copy() if isinstance(val, list) else val
-            params[key] = val
-        return params

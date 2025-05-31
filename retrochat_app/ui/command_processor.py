@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from .terminal_ui import TerminalUI # To avoid circular import at runtime
     from .code_block_formatter import CodeBlockFormatter # For type hint if needed
 
+from retrochat_app.core.config_manager import update_api_base_url # Add this import
+
 def process_command(ui: 'TerminalUI', command_input: str) -> bool:
     """
     Parses and executes commands.
@@ -42,6 +44,16 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
                 if value.lower() == "true": ui.llm_client.set_parameter(param_name, True)
                 elif value.lower() == "false": ui.llm_client.set_parameter(param_name, False)
                 else: ui.console.print("[red]Invalid value for stream. Use 'true' or 'false'.[/red]")
+            elif param_name.lower() == "endpoint":
+                # Validate and update the endpoint
+                if ":" not in value or not value.replace(".", "").replace(":", "").isdigit():
+                    ui.console.print("[red]Invalid endpoint format. Expected IP:PORT (e.g., 192.168.1.82:1234).[/red]")
+                else:
+                    # value is now just "ip:port"
+                    update_api_base_url(value) # Pass "ip:port" directly
+                    ui.llm_client.update_endpoint()
+                    # CHAT_COMPLETIONS_ENDPOINT is updated in config_manager and llm_client will pick it up
+                    ui.console.print(f"[green]API endpoint updated. Current completions endpoint: {ui.llm_client.endpoint}[/green]")
             else:
                 ui.llm_client.set_parameter(param_name, value)
         else:
@@ -95,8 +107,6 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
                     # When loading a session, we might want to re-process and display its history
                     # For now, just resetting the formatter. Displaying history would require
                     # iterating through loaded history and calling formatter.
-                # else:
-                    # ui.console.print(f"Failed to load session '{session_to_load}'.") # load_session handles messages
             else:
                 ui.console.print("Usage: /chat load <session_id>")
         elif sub_command == "list":

@@ -27,6 +27,7 @@ def show_help(console: Console):
     console.print("  /chat delete <session_id>      - Delete a specific chat session.")
     console.print("  /chat rename <new_name>        - Rename the current active chat session.")
     console.print("  /chat current                  - Show the current session ID and metadata.")
+    console.print("  /stream true/false             - Enable or disable streaming responses.")
     console.print("  /think show                    - Show AI thought process (styled, no tags).")
     console.print("  /think hide                    - Hide AI thought process.")
     console.print("  /copy <CodeID>                 - Copy the content of a specific code block to clipboard.")
