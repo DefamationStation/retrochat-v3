@@ -98,68 +98,61 @@ class LLMClient:
             response_data = response.json()
             
             if response_data.get("choices") and len(response_data["choices"]) > 0:
-                assistant_message = response_data["choices"][0].get("message", {}).get("content")
-                return assistant_message
-            else:
-                print("Error: No response choices found in API reply.")
-                print("Full response:", response_data)
-                return None
+                # Check if 'message' key exists and has 'content'
+                if "message" in response_data["choices"][0] and "content" in response_data["choices"][0]["message"]:
+                    return response_data["choices"][0]["message"]["content"]
+                # Fallback for models that might structure response differently, e.g. with 'delta'
+                elif "delta" in response_data["choices"][0] and "content" in response_data["choices"][0]["delta"]:
+                    return response_data["choices"][0]["delta"]["content"]
+            return None  # Or handle as an error/empty response appropriately
         except requests.exceptions.RequestException as e:
-            print(f"Error connecting to LM Studio: {e}")
+            print(f"[ERROR] Error during LLM communication: {e}")
             return None
         except json.JSONDecodeError:
-            print("Error: Could not decode JSON response from API.")
-            print("Raw response:", response.text)
+            print(f"[ERROR] Failed to decode JSON response: {response.text}")
             return None
 
-    def send_chat_message_streaming(self, messages: List[Dict[str, Any]], console) -> Optional[str]:
-        """Sends a chat request and handles streaming response."""
+    def stream_chat_message(self, messages: List[Dict[str, Any]]):
+        """Sends a chat request and streams the response."""
         if not messages:
             print("Error: Message list cannot be empty.")
-            yield "Error: Message list cannot be empty." # Yield error message
+            yield "" # Or raise an error
             return
 
         payload = self._get_current_params_payload()
-        payload["messages"] = messages # Use the provided full history
-        stream_flag = payload["stream"] # Get current stream setting
+        payload["messages"] = messages
         payload["stream"] = True # Ensure stream is True for this method
 
         headers = {"Content-Type": "application/json"}
 
-        full_response_content = "" # To accumulate the full response content
         try:
-            response = requests.post(self.endpoint, headers=headers, data=json.dumps(payload), stream=True)
-            response.raise_for_status()
-            client = None # Placeholder for SSEClient if we use it
-            # Manual chunk processing if not using SSEClient or server sends raw chunks
-            for line in response.iter_lines():
-                if line:
-                    decoded_line = line.decode('utf-8')
-                    if decoded_line.startswith("data: "): # Standard SSE format
-                        json_data_part = decoded_line[len("data: "):]
-                        if json_data_part.strip() == "[DONE]": # LM Studio specific end signal
-                            break
-                        try:
-                            chunk_data = json.loads(json_data_part)
-                            if chunk_data.get("choices") and len(chunk_data["choices"]) > 0:
-                                delta = chunk_data["choices"][0].get("delta", {}).get("content")
-                                if delta:
-                                    yield delta
-                                    full_response_content += delta # Accumulate the delta
-                        except json.JSONDecodeError:
-                            pass # Ignore lines that are not valid JSON
-
+            with requests.post(self.endpoint, headers=headers, data=json.dumps(payload), stream=True) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8')
+                        if decoded_line.startswith("data: "):
+                            json_content = decoded_line[len("data: "):]
+                            if json_content.strip() == "[DONE]":
+                                break
+                            try:
+                                data = json.loads(json_content)
+                                if data.get("choices") and len(data["choices"]) > 0:
+                                    delta = data["choices"][0].get("delta", {})
+                                    content = delta.get("content")
+                                    if content:
+                                        yield content
+                            except json.JSONDecodeError:
+                                print(f"[ERROR] Failed to decode JSON stream chunk: {json_content}")
+                                continue # Skip this chunk and try to process the next
         except requests.exceptions.RequestException as e:
-            print(f"Error connecting to LM Studio for streaming: {e}")
-            yield f" Error: {e}"
+            print(f"[ERROR] Error during LLM communication: {e}")
+            yield "" # Or raise an error
         except Exception as e:
-            print(f"An unexpected error occurred during streaming: {e}")
-            yield f" Error: {e}"
-        finally:
-            self.stream = stream_flag # Restore original stream setting
-        return full_response_content
-    
-    def get_all_parameters(self) -> Dict[str, Any]:
+            print(f"[ERROR] An unexpected error occurred during streaming: {e}")
+            yield "" # Or raise an error
+
+    def get_params(self) -> Dict[str, Any]:
         """Returns a dictionary of all current model parameters."""
         return {
             self.PARAM_KEY_MAP["model"]: self.model,
