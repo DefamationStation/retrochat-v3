@@ -34,9 +34,11 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
         # Assuming show_system_info is now in display_handler and called from ui or passed console and llm_client
         from .display_handler import show_system_info # Local import to use the new function
         show_system_info(ui.console, ui.llm_client)
+        return False
     elif command == "/help":
         from .display_handler import show_help # Local import
         show_help(ui.console)
+        return False
     elif command == "/set":
         if len(args) == 2:
             param_name, value = args[0], args[1]
@@ -58,10 +60,12 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
                 ui.llm_client.set_parameter(param_name, value)
         else:
             ui.console.print("Usage: /set <param_name> <value>")
+        return False
     elif command == "/system":
         if not args: ui.console.print("Usage: /system <prompt_string> or /system clear")
         elif args[0].lower() == "clear": ui.llm_client.set_system_prompt(None)
         else: ui.llm_client.set_system_prompt(" ".join(args))
+        return False
     elif command == "/params":
         params = ui.llm_client.get_all_parameters()
         ui.console.print("Current Parameters:") 
@@ -70,6 +74,7 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
             elif key == "system_prompt": ui.console.print(f'  {key}: "{value}"')
             else: ui.console.print(f"  {key}: {value}")
         ui.console.print("-" * 30)
+        return False
     elif command == "/stream":
         if len(args) == 1 and args[0].lower() in {"true", "false"}:
             ui.llm_client.set_parameter("stream", args[0].lower()) # Use set_parameter to save
@@ -84,7 +89,8 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
             for msg in history:
                 ui.console.print(f"  {msg['role'].capitalize()}: {msg['content']}")
             ui.console.print("-" * 30)
-    elif command == "/chat": 
+        return False
+    elif command == "/chat":
         if not args:
             ui.console.print("Usage: /chat <reset|new|load|list|delete|current|rename>")
             return False

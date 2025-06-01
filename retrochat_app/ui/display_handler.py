@@ -41,7 +41,10 @@ def show_system_info(console: Console, llm_client):
     console.print(f"  Model: {llm_client.model}")
 
     current_params = llm_client.get_all_parameters()
-    default_params = llm_client.default_params
+    
+    # Import config_manager to get default settings
+    from retrochat_app.core import config_manager
+    default_params = config_manager.get_default_settings()
 
     console.print("\n--- System Prompt ---")
     if current_params["system_prompt"]:
