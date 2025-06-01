@@ -7,6 +7,11 @@ def _process_text_for_code_blocks(markdown_text: str, starting_id: int) -> tuple
     """
     Finds code blocks, assigns unique string IDs, stores them, and embeds ID tags in the text.
     The ID tag is placed on the same line as the opening fence.
+    
+    Handles both well-formed and malformed code blocks:
+    - Well-formed: ```python\ncode\n```
+    - Malformed: ```python [CodeID: X]code``` (missing newlines)
+    
     Returns:
         - processed_markdown: Markdown text with ID tags embedded.
         - found_blocks: Dictionary of {block_id_str: code_content} for newly found blocks.
@@ -15,11 +20,11 @@ def _process_text_for_code_blocks(markdown_text: str, starting_id: int) -> tuple
     found_blocks = {}
     current_global_id = starting_id
     
-    # Regex to find fenced code blocks (```optional_lang\\ncode\\n```
-    # Captures: group(1)=opening_fence (e.g., ```python\\n), group(2)=code_content, group(3)=closing_fence (e.g., \\n```
-    # Updated regex to be more tolerant of whitespace:
+    # More robust regex that captures opening fence and checks for existing CodeID
+    # Captures: group(1)=fence_with_lang, group(2)=optional_existing_codeid, 
+    #          group(3)=optional_newline, group(4)=code_content, group(5)=closing
     code_block_pattern = re.compile(
-        r"^(```\s*(?:[a-zA-Z0-9_\\-]*)\s*(?:\r\n|\n|\r))(.*?)((?:\r\n|\n|\r)```\s*)$", 
+        r"(```\s*(?:[a-zA-Z0-9_\-]*)\s*)(?:\[CodeID: (\d+)\]\s*)?(\n?)(.*?)(\n?```)", 
         re.MULTILINE | re.DOTALL
     )
     
@@ -28,37 +33,52 @@ def _process_text_for_code_blocks(markdown_text: str, starting_id: int) -> tuple
     
     for match in code_block_pattern.finditer(markdown_text):
         start_block, end_block = match.span()
-        opening_fence = match.group(1) # e.g., ```python\\n or ```python  \\r\\n
-        code_content = match.group(2)  # The actual code
-        closing_fence = match.group(3) # e.g., \\n```
+        fence_with_lang = match.group(1)        # e.g., "```python " 
+        existing_code_id = match.group(2)       # Existing CodeID if present
+        newline_after_fence = match.group(3)    # Optional newline after fence/CodeID
+        code_content = match.group(4)           # The actual code content
+        closing_part = match.group(5)           # Optional newline + ```
 
-        # Extract the actual newline character(s) from the end of the opening_fence
-        newline_char_match = re.search(r"(\r\n|\n|\r)$", opening_fence)
-        # Fallback to \\n if regex somehow didn't ensure newline_char_match (should not happen with current regex)
-        newline_char = newline_char_match.group(0) if newline_char_match else '\\n'
+        # Determine the block ID to use
+        if existing_code_id:
+            # Use existing CodeID, don't increment counter
+            block_id_str = existing_code_id
+        else:
+            # Create new CodeID
+            block_id_str = str(current_global_id)
+            current_global_id += 1
         
-        # Get the content of the opening fence line, without the trailing newline
-        content_of_opening_fence_line = opening_fence[:-len(newline_char)]
-
-        block_id_str = str(current_global_id)
         found_blocks[block_id_str] = code_content
         
         # Add text before this code block
         processed_text_parts.append(markdown_text[last_end:start_block])
         
-        # Create the ID tag to be inserted, with a leading space
+        # Reconstruct with proper formatting
+        opening_fence_clean = fence_with_lang.rstrip()
         id_tag_display = f" [CodeID: {block_id_str}]"
         
-        # Insert the ID tag: strip trailing spaces from fence content, add tag, then add original newline
-        modified_opening_fence = content_of_opening_fence_line.rstrip() + id_tag_display + newline_char
+        # Always ensure proper newline after the CodeID tag
+        if newline_after_fence:
+            opening_fence_final = opening_fence_clean + id_tag_display + newline_after_fence
+        else:
+            # Add missing newline for malformed blocks
+            opening_fence_final = opening_fence_clean + id_tag_display + '\n'
+          # Ensure proper closing
+        if closing_part.startswith('\n'):
+            closing_final = closing_part
+        elif closing_part == '```':
+            # Missing newline before closing fence
+            closing_final = '\n```'
+        else:
+            # Some other format, try to fix it
+            closing_final = '\n' + closing_part
         
-        processed_text_parts.append(modified_opening_fence)
+        processed_text_parts.append(opening_fence_final)
         processed_text_parts.append(code_content)
-        processed_text_parts.append(closing_fence)
+        processed_text_parts.append(closing_final)
         
-        current_global_id += 1
         last_end = end_block
-            
+    
     processed_text_parts.append(markdown_text[last_end:])
     return "".join(processed_text_parts), found_blocks, current_global_id
 

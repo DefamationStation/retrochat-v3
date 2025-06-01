@@ -4,8 +4,9 @@ Shared utilities for code block regex and extraction logic.
 import re
 
 # Unified regex pattern for fenced code blocks (with optional language and optional [CodeID: N] tag)
+# Updated to handle malformed markdown where newlines might be missing
 CODE_BLOCK_PATTERN = re.compile(
-    r"```([a-zA-Z0-9_\-\.]*)(?:\s*\[CodeID: (\d+)\])?\s*\n(.*?)\n```",
+    r"```([a-zA-Z0-9_\-\.]*)(?:\s*\[CodeID: (\d+)\])?\s*\n?(.*?)```",
     re.DOTALL
 )
 
