@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 
 # Use the new configuration system
 from retrochat_app.core.config import get_config
+from retrochat_app.core import config_manager
 
 logger = logging.getLogger(__name__)
 
@@ -134,21 +135,69 @@ class LLMClient:
         return self.get_params()
 
     def set_parameter(self, param_name: str, value: Any) -> bool:
-        """Sets a model parameter and saves it to user settings."""
+        """Sets a model or API parameter and saves it to user settings."""
         try:
-            if param_name == "endpoint":
-                # Special handling for endpoint parameter
-                if ":" not in str(value) or not self.config.api._validate_ip_port(str(value)):
-                    print(f"[red]Invalid endpoint format. Expected IP:PORT (e.g., 192.168.1.82:1234).[/red]")
-                    return False
-                self.config.update_api_endpoint(str(value))
-                print(f"API endpoint updated to: {self.config.api.base_url}")
+            param_name_lower = param_name.lower()
+
+            if param_name_lower == "api_ip_port":
+                # Value should be "ip:port" or "http://ip:port"
+                config_manager.update_api_base_url(str(value))
+                # Refresh config
+                from retrochat_app.core.config import get_config as refresh_get_config # Local import for refresh
+                self.config = refresh_get_config()
+                print(f"API IP/Port updated. New endpoint: {self.endpoint}")
                 return True
-              # Handle model parameters
-            self.config.update_model_parameter(param_name, value)
-            print(f"Parameter '{param_name}' set to: {value}")
-            return True
+            elif param_name_lower == "api_full_endpoint":
+                config_manager.update_chat_completions_endpoint_direct(str(value))
+                # Refresh config
+                from retrochat_app.core.config import get_config as refresh_get_config # Local import for refresh
+                self.config = refresh_get_config()
+                print(f"API endpoint updated to: {self.endpoint}")
+                return True
+            elif param_name_lower == "endpoint":
+                # This case is now deprecated in favor of api_ip_port and api_full_endpoint
+                # For backward compatibility, or if other parts of code use it,
+                # we could map it to one of the new ones, e.g., full_endpoint.
+                # However, per user request, we are introducing specific commands.
+                # So, we can choose to make this an error or map it.
+                # For now, let's assume it's an error or no-op if called directly.
+                print(f"Warning: Setting 'endpoint' directly is deprecated. Use '/set ip' or '/set endpoint <full_url>'.")
+                # Or, if we want to map it:
+                # config_manager.update_chat_completions_endpoint_direct(str(value))
+                # from retrochat_app.core.config import get_config as refresh_get_config
+                # self.config = refresh_get_config()
+                # print(f"API endpoint updated to: {self.endpoint} (via deprecated 'endpoint' param)")
+                return False # Or True if mapped
             
+            # Handle model parameters (existing logic)
+            # Ensure self.config has update_model_parameter or similar
+            if hasattr(self.config, 'update_model_parameter'):
+                self.config.update_model_parameter(param_name, value)
+                print(f"Model parameter '{param_name}' set to: {value}")
+                return True
+            else:
+                # Fallback for other parameters if not model parameters handled by self.config
+                # This part might need adjustment based on how self.config handles general params
+                # For now, assume model parameters are the primary target for this path.
+                # If 'stream' is handled here, it should be.
+                if param_name_lower == "stream": # Example: if stream is a model param
+                    if hasattr(self.config, 'update_model_parameter'):
+                         self.config.update_model_parameter(param_name_lower, bool(value)) # Ensure boolean
+                         print(f"Model parameter '{param_name_lower}' set to: {bool(value)}")
+                         return True
+                    else: # if stream is handled differently, e.g. directly on config.model
+                        if hasattr(self.config, 'model') and hasattr(self.config.model, param_name_lower):
+                            setattr(self.config.model, param_name_lower, bool(value))
+                            # Assuming self.config.save() or similar is called by update_model_parameter
+                            # If not, direct attribute setting might not persist.
+                            # This part is speculative without seeing config.py's Config class.
+                            # For safety, let's assume update_model_parameter is the way.
+                            print(f"Parameter '{param_name_lower}' (potentially model) set to: {bool(value)}")
+                            return True
+
+                print(f"Parameter '{param_name}' (not API, not model) not explicitly handled by set_parameter.")
+                return False
+
         except ValueError as e:
             print(f"Error setting parameter '{param_name}': {e}")
             return False

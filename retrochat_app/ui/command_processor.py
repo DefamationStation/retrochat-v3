@@ -41,25 +41,47 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
         return False
     elif command == "/set":
         if len(args) == 2:
-            param_name, value = args[0], args[1]
-            if param_name.lower() == "stream":
-                if value.lower() == "true": ui.llm_client.set_parameter(param_name, True)
-                elif value.lower() == "false": ui.llm_client.set_parameter(param_name, False)
-                else: ui.console.print("[red]Invalid value for stream. Use 'true' or 'false'.[/red]")
-            elif param_name.lower() == "endpoint":
-                # Validate and update the endpoint
-                if ":" not in value or not value.replace(".", "").replace(":", "").isdigit():
-                    ui.console.print("[red]Invalid endpoint format. Expected IP:PORT (e.g., 192.168.1.82:1234).[/red]")
+            param_key, value_str = args[0].lower(), args[1]
+            
+            if param_key == "ip":
+                # Expected value_str: "192.168.1.82:1234" or "http://192.168.1.82:1234"
+                if ui.llm_client.set_parameter("api_ip_port", value_str):
+                    # Confirmation is printed by llm_client.set_parameter
+                    pass
                 else:
-                    # value is now just "ip:port"
-                    update_api_base_url(value) # Pass "ip:port" directly
-                    ui.llm_client.update_endpoint()
-                    # CHAT_COMPLETIONS_ENDPOINT is updated in config_manager and llm_client will pick it up
-                    ui.console.print(f"[green]API endpoint updated. Current completions endpoint: {ui.llm_client.endpoint}[/green]")
+                    ui.console.print(f"[red]Failed to set API IP/Port.[/red]")
+            elif param_key == "endpoint":
+                # Expected value_str: "http://192.168.1.82:1234/v1/chat/completions"
+                if ui.llm_client.set_parameter("api_full_endpoint", value_str):
+                    # Confirmation is printed by llm_client.set_parameter
+                    pass
+                else:
+                    ui.console.print(f"[red]Failed to set API endpoint.[/red]")
+            elif param_key == "stream":
+                stream_value = value_str.lower() == "true"
+                if ui.llm_client.set_parameter("stream", stream_value): # LLMClient should handle type
+                    ui.console.print(f"Stream set to: {stream_value}")
+                else:
+                    ui.console.print(f"[red]Failed to set stream parameter.[/red]")
             else:
-                ui.llm_client.set_parameter(param_name, value)
+                # For other model parameters (temperature, max_tokens, etc.)
+                # Try to convert to float or int if applicable, otherwise pass as string
+                # LLMClient's set_parameter or config.update_model_parameter should handle final type casting
+                try:
+                    if '.' in value_str:
+                        typed_value = float(value_str)
+                    else:
+                        typed_value = int(value_str)
+                except ValueError:
+                    typed_value = value_str # Pass as string if not clearly float/int
+
+                if ui.llm_client.set_parameter(param_key, typed_value):
+                    # Confirmation printed by llm_client or its underlying methods
+                    pass
+                else:
+                    ui.console.print(f"[red]Failed to set parameter '{param_key}'.[/red]")
         else:
-            ui.console.print("Usage: /set <param_name> <value>")
+            ui.console.print("Usage: /set <key> <value>. Use /help for available commands and keys.")
         return False
     elif command == "/system":
         if not args: ui.console.print("Usage: /system <prompt_string> or /system clear")
@@ -75,11 +97,15 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
             else: ui.console.print(f"  {key}: {value}")
         ui.console.print("-" * 30)
         return False
-    elif command == "/stream":
+    elif command == "/stream": # This command might become redundant if /set stream true/false is preferred
         if len(args) == 1 and args[0].lower() in {"true", "false"}:
-            ui.llm_client.set_parameter("stream", args[0].lower()) # Use set_parameter to save
+            stream_value = args[0].lower() == "true"
+            if ui.llm_client.set_parameter("stream", stream_value): # Use set_parameter to save
+                 ui.console.print(f"Stream set to: {stream_value}")
+            else:
+                ui.console.print(f"[red]Failed to set stream parameter via /stream command.[/red]")
         else:
-            ui.console.print("[cyan]Usage: /stream true|false[/cyan]")
+            ui.console.print("[cyan]Usage: /stream true|false. Consider using /set stream true|false.[/cyan]")
         return False
     elif command == "/history":
         history = ui.session_manager.get_conversation_history()
