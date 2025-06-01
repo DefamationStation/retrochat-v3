@@ -7,13 +7,14 @@ from datetime import datetime
 import logging # Added import
 
 from retrochat_app.core.config_manager import SESSIONS_DIR, LAST_SESSION_FILE
-from retrochat_app.core.text_processing_utils import _process_text_for_code_blocks # Added import
+# from retrochat_app.core.text_processing_utils import _process_text_for_code_blocks # Removed import
+from retrochat_app.core.code_block_utils import process_and_assign_code_block_ids # MODIFIED: Use centralized function
 from retrochat_app.core.io_utils import read_json_file, write_json_file # Added import
 
 class SessionManager:
     """
     Manages chat sessions, including loading, saving, creating new sessions,
-    and handling persistent code block IDs.
+    and handling persistent code block IDs using centralized utilities.
     """
     def __init__(self):
         self.sessions_dir = SESSIONS_DIR
@@ -92,7 +93,8 @@ class SessionManager:
                     self.current_session_data["code_blocks"] = {}
                 if "next_code_block_global_id" not in self.current_session_data:
                     self.current_session_data["next_code_block_global_id"] = 1
-                    # self._reprocess_history_for_code_blocks() # Optional: consider if needed
+                    # No longer re-processing history here, as the new function handles ID assignment
+                    # during message addition or if a specific utility is called to re-process.
 
                 self._save_last_session_id() # Update last session on successful load
                 return True
@@ -107,21 +109,8 @@ class SessionManager:
              self.new_session()
         return False
 
-    # Optional: Method to re-process history of old sessions if they are loaded
-    # def _reprocess_history_for_code_blocks(self):
-    #     all_new_blocks = {}
-    #     next_id = 1
-    #     processed_history = []
-    #     for msg in self.current_session_data.get("conversation_history", []):
-    #         if msg.get("role") == "assistant":
-    #             processed_content, new_blocks, next_id_after_msg = _process_text_for_code_blocks(msg["content"], next_id)
-    #             msg["content"] = processed_content
-    #             all_new_blocks.update(new_blocks)
-    #             next_id = next_id_after_msg
-    #         processed_history.append(msg)
-    #     self.current_session_data["conversation_history"] = processed_history
-    #     self.current_session_data["code_blocks"] = all_new_blocks
-    #     self.current_session_data["next_code_block_global_id"] = next_id
+    # Removed _reprocess_history_for_code_blocks as this logic is now part of process_and_assign_code_block_ids
+    # or would be a separate utility if needed for bulk reprocessing.
 
     def save_session(self):
         """Saves the current session data (including code blocks) to a file."""
@@ -165,28 +154,28 @@ class SessionManager:
     def add_message_to_history(self, role: str, content: str):
         """
         Adds a message to the history. If it's an assistant message,
-        it processes the content for code blocks, assigns global IDs,
-        stores them, and embeds ID tags in the content.
+        it processes the content for code blocks using the centralized utility,
+        which assigns global IDs, stores them in session_data, and embeds ID tags.
         """
         if role == "assistant":
-            processed_content, new_blocks, next_id = _process_text_for_code_blocks(
+            # Use the centralized function. It updates self.current_session_data directly.
+            processed_content, _ = process_and_assign_code_block_ids(
                 content,
-                self.current_session_data.get("next_code_block_global_id", 1)
+                self.current_session_data # Pass the whole session_data dict
             )
+            # new_blocks are already updated in self.current_session_data["code_blocks"]
+            # self.current_session_data["next_code_block_global_id"] is also updated by the function
             
             self.current_session_data.setdefault("conversation_history", []).append({"role": role, "content": processed_content})
-            self.current_session_data.setdefault("code_blocks", {}).update(new_blocks)
-            self.current_session_data["next_code_block_global_id"] = next_id
-        else: # User messages or system messages (if you add them directly to history)
+            # No need to update code_blocks or next_code_block_global_id here, it's done by the utility.
+        else: # User messages or system messages
             self.current_session_data.setdefault("conversation_history", []).append({"role": role, "content": content})
         
         # Auto-save after each message
         try:
             self.save_session()
         except Exception as e:
-            # from retrochat_app.ui.display_handler import log_error, Console # Removed import
-            # log_error(Console(), f"Failed to save session after adding message: {e}") # Removed UI call
-            logging.error(f"Failed to save session after adding message: {e}") # Added logging
+            logging.error(f"Failed to save session after adding message: {e}")
 
     def get_current_session_history(self) -> list:
         """Returns the conversation history of the current session."""

@@ -6,6 +6,7 @@ import os
 import platform
 import logging # Added import
 import urllib.parse # Added for URL parsing
+from typing import Any # Added to resolve lint error
 
 # --- Default Configuration ---
 # LM Studio API endpoint
@@ -52,6 +53,71 @@ top_p = 0.95 # Nucleus sampling: 0.1 to 1.0
 presence_penalty = 0.0 # -2.0 to 2.0
 frequency_penalty = 0.0 # -2.0 to 2.0
 stop_sequences = [] # List of strings, e.g., ["\\nUser:", "Observation:"]
+
+# --- Known Model Parameters ---
+KNOWN_MODEL_PARAMS = {
+    "model_name": str,
+    "temperature": float,
+    "max_tokens": int,
+    "stream": bool,
+    "system_prompt": (str, type(None)), # Allow None, ensure empty string becomes None
+    "top_p": float,
+    "presence_penalty": float,
+    "frequency_penalty": float,
+    "stop_sequences": list,
+}
+
+# --- Parameter Type Validation and Conversion ---
+def _validate_and_convert(param_name: str, value: Any, expected_type_info: Any) -> Any:
+    """
+    Validates and converts a value to its expected type.
+    Returns the converted value or raises ValueError/TypeError.
+    """
+    if param_name == "system_prompt" and value == "":
+        return None # Convert empty string for system_prompt to None
+
+    # Handle cases where expected_type_info is a single type (e.g., str, int)
+    # or a tuple of types (e.g., (str, type(None)))
+    if isinstance(expected_type_info, tuple): # e.g. (str, type(None))
+        # Try to convert to the primary type first if not None
+        if value is not None:
+            primary_type = next(t for t in expected_type_info if t is not type(None))
+            try:
+                converted_value = primary_type(value)
+                if isinstance(converted_value, primary_type): # Check successful conversion
+                     return converted_value
+            except (ValueError, TypeError):
+                 pass # Will be caught by the isinstance check below if no type matches
+
+        # Check if value is an instance of any of the allowed types
+        if isinstance(value, expected_type_info):
+            return value
+        raise TypeError(f"Parameter '{param_name}' expects type {expected_type_info}, but got {type(value)} ('{value}').")
+
+    # Single type case
+    try:
+        converted_value = expected_type_info(value)
+        # Additional check for bool, as bool("False") is True
+        if expected_type_info == bool and isinstance(value, str):
+            if value.lower() in ["true", "1", "yes"]:
+                return True
+            elif value.lower() in ["false", "0", "no"]:
+                return False
+            else:
+                raise ValueError(f"Cannot convert string '{value}' to boolean for parameter '{param_name}'. Use 'true' or 'false'.")
+        
+        # For lists, ensure elements are strings if it's stop_sequences
+        if param_name == "stop_sequences" and expected_type_info == list:
+            if not isinstance(value, list):
+                 raise TypeError(f"Parameter '{param_name}' expects a list, but got {type(value)}.")
+            if not all(isinstance(item, str) for item in value):
+                raise ValueError(f"All items in '{param_name}' list must be strings.")
+            return value # Already validated as list of strings or an empty list
+
+        return converted_value
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Error converting value '{value}' for parameter '{param_name}' to {expected_type_info}: {e}")
+
 
 def get_default_settings():
     """Returns a dictionary of the default settings (all lowercase with underscores)."""
@@ -148,6 +214,10 @@ def update_api_base_url(ip_port_str: str):
     
     logging.info(f"API base URL updated to: {API_BASE_URL}")
     logging.info(f"Chat completions endpoint reset to default path: {CHAT_COMPLETIONS_ENDPOINT}")
+    # Reload config to ensure globals are updated everywhere
+    # from retrochat_app.core.config import load_config # Assuming this reloads based on current state
+    # load_config()
+
 
 def update_chat_completions_endpoint_direct(full_url: str):
     """Updates the CHAT_COMPLETIONS_ENDPOINT directly to the given full_url and saves it.
@@ -187,6 +257,50 @@ def update_chat_completions_endpoint_direct(full_url: str):
 
     logging.info(f"Chat completions endpoint updated to: {CHAT_COMPLETIONS_ENDPOINT}")
     logging.info(f"API base URL (parsed or existing) set to: {API_BASE_URL}")
+    # Reload config to ensure globals are updated everywhere
+    # from retrochat_app.core.config import load_config # Assuming this reloads based on current state
+    # load_config()
+
+def update_model_parameter(param_name: str, value: Any) -> bool:
+    """
+    Updates a specific model parameter, validates its type, and saves it to user settings.
+    """
+    param_name_lower = param_name.lower()
+
+    if param_name_lower not in KNOWN_MODEL_PARAMS:
+        logging.error(f"Attempted to set unknown model parameter: '{param_name_lower}'")
+        return False
+
+    expected_type = KNOWN_MODEL_PARAMS[param_name_lower]
+
+    try:
+        converted_value = _validate_and_convert(param_name_lower, value, expected_type)
+    except (ValueError, TypeError) as e:
+        logging.error(f"Validation/conversion error for parameter '{param_name_lower}': {e}")
+        print(f"Error: Could not set parameter '{param_name}'. {e}")
+        return False
+
+    current_settings = load_user_settings()  # Load existing to preserve other settings
+    
+    # Ensure all known model params have a default if not in current_settings
+    # This is important if a new param is added to KNOWN_MODEL_PARAMS
+    # and an old user_settings.json doesn't have it.
+    defaults = get_default_settings()
+    for key, default_val in defaults.items():
+        if key in KNOWN_MODEL_PARAMS and key not in current_settings:
+            current_settings[key] = default_val
+            
+    current_settings[param_name_lower] = converted_value
+    save_user_settings(current_settings)
+    
+    logging.info(f"Model parameter '{param_name_lower}' updated to: {converted_value}")
+    print(f"Parameter '{param_name_lower}' set to: {converted_value}")
+    
+    # Reload config to ensure globals are updated everywhere
+    # This is crucial for the Config object in config.py to pick up changes
+    # from retrochat_app.core.config import load_config # Assuming this reloads based on current state
+    # load_config()
+    return True
 
 # Load initial settings, which might update API_BASE_URL
 load_user_settings()

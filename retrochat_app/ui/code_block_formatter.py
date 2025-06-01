@@ -5,128 +5,101 @@ from rich.syntax import Syntax
 from rich.text import Text
 from rich.markdown import Markdown # Added for consistency, though not directly used in this snippet
 
-from retrochat_app.core.code_block_utils import CODE_BLOCK_PATTERN # Import the robust regex
+# Use the EXTRACTION pattern for display parsing, not the reconstruction one.
+from retrochat_app.core.code_block_utils import CODE_BLOCK_EXTRACTION_PATTERN, extract_code_blocks 
 
 class CodeBlockFormatter:
     """
-    Manages the creation, storage, and display formatting of code blocks
-    within assistant messages, using a direct reference to session data.
+    Manages the display formatting of code blocks within assistant messages.
+    It uses `extract_code_blocks` to find blocks and their IDs (if present in the text)
+    and then retrieves the definitive code content from `session_data` using these IDs.
+    It no longer assigns or stores code blocks itself.
     """
-    # Use the more robust regex from code_block_utils.py
-    REGEX_CODE_BLOCK = CODE_BLOCK_PATTERN
+    # Use the extraction-focused regex from code_block_utils.py
+    REGEX_CODE_BLOCK = CODE_BLOCK_EXTRACTION_PATTERN
 
     def __init__(self, session_data: dict):
         """
         Initializes the formatter with a reference to the session's data dictionary.
-        Ensures 'code_blocks' and 'next_code_block_global_id' are initialized if not present.
         """
-        self.logger = logging.getLogger(__name__) # Added
+        self.logger = logging.getLogger(__name__) 
         self.session_data = session_data
-        if "code_blocks" not in self.session_data:
-            self.session_data["code_blocks"] = {}
-            self.logger.debug(f"Initialized 'code_blocks' in session_data.") # Added
-        if "next_code_block_global_id" not in self.session_data:
-            self.session_data["next_code_block_global_id"] = 1
-            self.logger.debug(f"Initialized 'next_code_block_global_id' to 1 in session_data.") # Added
-        self.logger.debug(f"CodeBlockFormatter initialized. Current IDs: {list(self.session_data['code_blocks'].keys())}, Next ID: {self.session_data['next_code_block_global_id']}") # Added
+        # No longer initializes code_blocks or next_code_block_global_id here,
+        # as this class is now only for formatting/display based on existing session_data.
+        self.logger.debug(f"CodeBlockFormatter initialized. Accessing session_data for code blocks.")
 
-    # Removed load_from_session method
-
-    def reset(self):
-        """Resets the code block information in the session data."""
-        self.logger.debug("Resetting CodeBlockFormatter state in session_data.") # Added
-        self.session_data["code_blocks"] = {}
-        self.session_data["next_code_block_global_id"] = 1
-
-    def _store_and_get_id(self, code_content: str) -> str:
-        """
-        Stores the code block content in session_data if new, or returns existing ID.
-        """
-        self.logger.debug(f"Attempting to store/get ID for code content (first 50 chars): {code_content[:50].strip()}...") # Added
-        # Check if this exact code content already exists
-        for existing_id, existing_content in self.session_data["code_blocks"].items():
-            if existing_content == code_content:
-                self.logger.debug(f"Found existing ID '{existing_id}' for content.") # Added
-                return existing_id
-        
-        # If not, store it with a new ID
-        new_id = str(self.session_data["next_code_block_global_id"])
-        self.session_data["code_blocks"][new_id] = code_content
-        self.session_data["next_code_block_global_id"] += 1
-        self.logger.debug(f"Stored new code block with ID '{new_id}'. Next ID is now {self.session_data['next_code_block_global_id']}.") # Added
-        return new_id
+    # Removed reset method, as state is managed by SessionManager.
+    # Removed _store_and_get_id method, as storage and ID generation is centralized.
 
     def get_code_by_id(self, block_id: str) -> str | None:
         """Retrieves code content by its global ID from session_data."""
-        code = self.session_data["code_blocks"].get(block_id)
+        code = self.session_data.get("code_blocks", {}).get(block_id)
         if code:
-            self.logger.debug(f"Retrieved code for ID '{block_id}'.") # Added
+            self.logger.debug(f"Retrieved code for ID '{block_id}'.")
         else:
-            self.logger.warning(f"Failed to retrieve code for ID '{block_id}'. Available IDs: {list(self.session_data['code_blocks'].keys())}") # Added
+            self.logger.warning(f"Failed to retrieve code for ID '{block_id}'. Available IDs in session: {list(self.session_data.get('code_blocks', {}).keys())}")
         return code
 
     def format_for_display(self, text: str) -> list:
         """
         Formats text containing code blocks for display.
-        Extracts code blocks, stores them, assigns IDs, and prepares renderables.
+        Uses `extract_code_blocks` to find block details (lang, ID, raw content from text).
+        If an ID is found, it prioritizes fetching content from `session_data` using that ID.
         """
         self.logger.debug(f"Formatting text for display (length: {len(text)}). Input text (first 100 chars): {text[:100].encode('utf-8', 'replace').decode('utf-8')}")
         renderables = []
         last_end = 0
 
-        # Now uses the robust REGEX_CODE_BLOCK from code_block_utils
-        # The REGEX_CODE_BLOCK is already compiled with re.DOTALL, so no need to pass flags here.
-        for match in re.finditer(self.REGEX_CODE_BLOCK, text):
-            self.logger.debug(f"Regex found a code block match: {match.group(0)[:70].encode('utf-8', 'replace').decode('utf-8')}...")
-            start, end = match.span()
+        # Use the centralized extract_code_blocks function
+        # It returns (language, code_id_from_text, raw_code_content_from_text, match_span)
+        extracted_blocks = extract_code_blocks(text)
+
+        for lang_from_text, id_from_text, raw_content_from_text, (start, end) in extracted_blocks:
+            self.logger.debug(f"Processing extracted block: Lang='{lang_from_text}', ID='{id_from_text}', Span=({start},{end}), RawContent (start): '{raw_content_from_text[:30].strip()}...'")
             
             # Add preceding text if any
             if start > last_end:
                 preceding_text = text[last_end:start].strip()
                 if preceding_text:
-                    # Using Markdown for non-code text parts
                     renderables.append(Markdown(preceding_text))
 
-            # Extract parts using the new regex groups
-            language = match.group(1).strip() if match.group(1) else "plaintext" # Group 1: Language
-            existing_code_id = match.group(2)  # Group 2: Existing CodeID (string or None)
-            code_content = match.group(3).strip()    # Group 3: Clean code content
-            
-            self.logger.debug(f"Parsed - Lang: '{language}', ExistingID: '{existing_code_id}', Code (start): '{code_content[:30]}...'")
+            code_to_display: str | None = None
+            block_id_to_show: str | None = id_from_text
+            language_to_use = lang_from_text if lang_from_text else "text"
 
-            block_id_to_use: str
-            if existing_code_id:
-                # An ID was present in the markdown. Use it.
-                block_id_to_use = existing_code_id
-                self.logger.info(f"Using existing CodeID '{block_id_to_use}' from parsed markdown for content (first 30): {code_content[:30]}...")
-                
-                # CRUCIAL FIX: Store/update the code content for this ID.
-                # This ensures that if the markdown contains an ID (from history or LLM),
-                # the formatter's understanding of that ID's content is up-to-date with the
-                # (stripped) version of the code it just parsed from the input text.
-                self.session_data["code_blocks"][block_id_to_use] = code_content 
-                self.logger.debug(f"Stored/Updated code for ID '{block_id_to_use}' in session_data. Content (first 30): {code_content[:30]}...")
-
-                # Ensure next_code_block_global_id is at least past this ID
-                current_next_id = self.session_data.get("next_code_block_global_id", 1)
-                if int(block_id_to_use) >= current_next_id:
-                    self.session_data["next_code_block_global_id"] = int(block_id_to_use) + 1
-                    self.logger.debug(f"Updated next_code_block_global_id to {self.session_data['next_code_block_global_id']} due to existing_code_id {block_id_to_use}")
+            if id_from_text:
+                # An ID was present in the markdown. Fetch content from session_data.
+                code_from_session = self.get_code_by_id(id_from_text)
+                if code_from_session is not None:
+                    code_to_display = code_from_session
+                    self.logger.info(f"Using content from session_data for CodeID '{id_from_text}'.")
+                else:
+                    # ID in text, but not in session_data. This is an issue.
+                    # Fallback to raw content from text for display, but log a warning.
+                    code_to_display = raw_content_from_text.strip() # Use stripped raw content as fallback
+                    self.logger.warning(f"CodeID '{id_from_text}' found in text but not in session_data. Displaying raw content from text.")
             else:
-                # No CodeID in markdown (e.g., new block in current session, or old format without tags).
-                # Store it (if new) and get/generate an ID using the clean code_content.
-                self.logger.info(f"No existing CodeID found in markdown. Calling _store_and_get_id for content: {code_content[:30]}...")
-                block_id_to_use = self._store_and_get_id(code_content) # This handles storing and ID generation
-            
-            panel = Panel(
-                Syntax(code_content, language, theme="dracula", line_numbers=True, word_wrap=True),
-                title=f"Language: {language}", # Title shows clean language
-                border_style="blue",
-                expand=False
-            )
-            renderables.append(panel)
-            # Display the CodeID (either existing or newly generated)
-            renderables.append(Text(f"CodeID {block_id_to_use}", style="dim"))
+                # No CodeID in markdown. This implies the text hasn't been processed by
+                # session_manager to embed IDs yet, or it's a very old format.
+                # For display, we have to use the raw content. This scenario should be rare
+                # if messages are always processed by SessionManager first.
+                code_to_display = raw_content_from_text.strip() # Use stripped raw content
+                self.logger.warning(f"No CodeID found in markdown for block starting with '{raw_content_from_text[:30].strip()}...'. Displaying raw content. This might indicate unprocessed text.")
+                # We don't have an authoritative ID to show in this case.
+                block_id_to_show = None 
+
+            if code_to_display is not None:
+                panel = Panel(
+                    Syntax(code_to_display, language_to_use, theme="dracula", line_numbers=True, word_wrap=True),
+                    title=f"Language: {language_to_use}",
+                    border_style="blue",
+                    expand=False
+                )
+                renderables.append(panel)
+                if block_id_to_show:
+                    renderables.append(Text(f"CodeID {block_id_to_show}", style="dim"))
+                else:
+                    renderables.append(Text("CodeID: N/A (not found in session)", style="dim warning"))
             
             last_end = end
 
@@ -134,12 +107,11 @@ class CodeBlockFormatter:
         if last_end < len(text):
             remaining_text = text[last_end:].strip()
             if remaining_text:
-                renderables.append(Markdown(remaining_text)) # Use Markdown for regular text
+                renderables.append(Markdown(remaining_text))
         
-        # If no code blocks were found at all, and original text was not just whitespace
         if not renderables and text.strip():
             renderables.append(Markdown(text.strip()))
-        elif not text.strip() and not renderables: # Handle empty or whitespace-only input if nothing else rendered
+        elif not text.strip() and not renderables: 
              renderables.append(Text(""))
 
         return renderables

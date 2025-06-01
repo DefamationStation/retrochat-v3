@@ -124,25 +124,27 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
         sub_command = args[0].lower()
         if sub_command == "reset":
             ui.session_manager.clear_current_session_history() # This method should handle its own print confirmation
-            ui.code_block_formatter.reset() # Reset formatter
+            ui.console.print("[green]Chat history and associated code blocks for the current session have been cleared.[/green]")
         elif sub_command == "new":
             new_session_id = args[1] if len(args) > 1 else None
             ui.session_manager.new_session(new_session_id)
-            ui.code_block_formatter.reset() # Reset formatter
-            ui.console.print(f"Started new session: {ui.session_manager.get_current_session_id()}")
+            # TODO: TerminalUI's code_block_formatter needs to be re-initialized with the new session_data
+            ui.console.print(f"Started new session: {ui.session_manager.current_session_id}")
         elif sub_command == "load":
             if len(args) > 1:
                 session_to_load = args[1]
                 if ui.session_manager.load_session(session_to_load):
-                    ui.code_block_formatter.reset() # Reset formatter
-                    # ui.console.print(f"Session '{session_to_load}' loaded.") # load_session handles messages
-                    # When loading a session, we might want to re-process and display its history
-                    # For now, just resetting the formatter. Displaying history would require
-                    # iterating through loaded history and calling formatter.
+                    # TODO: TerminalUI's code_block_formatter needs to be re-initialized with the new session_data
+                    ui.console.print(f"Session '{session_to_load}' loaded.")
+                    # Consider calling a method in UI to refresh history display
+                else:
+                    # If load_session failed and potentially started a recovery session
+                    # TODO: TerminalUI's code_block_formatter needs to be re-initialized
+                    ui.console.print(f"[yellow]Failed to load session '{session_to_load}'. Active session is now '{ui.session_manager.current_session_id}'.[/yellow]")
             else:
                 ui.console.print("Usage: /chat load <session_id>")
         elif sub_command == "list":
-            sessions = ui.session_manager.list_sessions()
+            sessions = ui.session_manager.get_all_sessions() # Corrected method name
             if not sessions:
                 ui.console.print("No sessions found.")
             else:
@@ -156,10 +158,10 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
             else:
                 ui.console.print("Usage: /chat delete <session_id>")
         elif sub_command == "current":
-            session_id = ui.session_manager.get_current_session_id()
+            session_id = ui.session_manager.current_session_id # Corrected to direct attribute access
             if session_id:
                 metadata = ui.session_manager.get_current_session_metadata()
-                ui.console.print(f"\\\\nCurrent Session ID: {session_id}")
+                ui.console.print(f"\\\\\\\\nCurrent Session ID: {session_id}")
                 ui.console.print("  Metadata:")
                 for key, value in metadata.items():
                     ui.console.print(f"    {key}: {value}")
@@ -169,7 +171,7 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
         elif sub_command == "rename": 
             if len(args) > 1:
                 new_name = args[1]
-                current_id = ui.session_manager.get_current_session_id()
+                current_id = ui.session_manager.current_session_id # Corrected to direct attribute access
                 if not current_id:
                     ui.console.print("[red]Error: No active session to rename.[/red]")
                 elif not new_name.strip():
