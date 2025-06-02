@@ -35,6 +35,13 @@ def show_help(console: Console):
     console.print("  /think hide                    - Hide AI thought process.")
     console.print("  /copy <CodeID>                 - Copy the content of a specific code block to clipboard.")
     console.print("  /exit or /quit                 - Exit the chat.")
+    console.print("")
+    console.print("Provider management commands:")
+    console.print("  /provider list                 - List configured providers.")
+    console.print("  /provider add <name> <type> <api_base_url> [chat_endpoint]  - Add a new provider and edit its config.")
+    console.print("  /provider edit <name>          - Edit an existing provider's configuration in editor.")
+    console.print("  /provider delete <name>        - Delete a provider.")
+    console.print("  /provider select <name>        - Select a provider as active.")
     console.print("-" * 30)
 
 def show_system_info(console: Console, llm_client):
@@ -69,6 +76,19 @@ def show_system_info(console: Console, llm_client):
 
     if not has_custom_params:
         console.print("  All parameters are at their default values.")
+    console.print("-" * 30)
+    # Provider info
+    from retrochat_app.core import provider_manager
+    provs, active = provider_manager.list_providers()
+    console.print("\n--- Providers ---")
+    if not provs:
+        console.print("  No providers configured. Using defaults.")
+    else:
+        console.print(f"  Active provider: {active if active else 'None'}")
+        console.print("  All providers:")
+        for p in provs:
+            mark = "*" if p.get('name') == active else " "
+            console.print(f"   {mark} {p.get('name')}")
     console.print("-" * 30)
 
 def render_message(console: Console, role: str, text: str, is_error: bool = False, is_thought: bool = False, show_thoughts_flag: bool = False):
