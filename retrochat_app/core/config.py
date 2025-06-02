@@ -5,6 +5,7 @@ This module provides a unified configuration interface.
 import re
 from typing import Dict, Any, List, Optional
 from . import config_manager
+from retrochat_app.core import provider_manager
 
 
 class APIConfig:
@@ -15,13 +16,19 @@ class APIConfig:
     
     @property
     def base_url(self) -> str:
-        """Get the base API URL."""
+        """Get the base API URL, preferring active provider config."""
+        provider = provider_manager.get_active_provider()
+        if provider and provider.get("api_base_url"):
+            return provider.get("api_base_url")
         settings = config_manager.load_user_settings()
         return settings.get("api_base_url", config_manager.API_BASE_URL)
     
     @property
     def chat_completions_endpoint(self) -> str:
-        """Get the chat completions endpoint."""
+        """Get the chat completions endpoint, preferring active provider config."""
+        provider = provider_manager.get_active_provider()
+        if provider and provider.get("chat_completions_endpoint"):
+            return provider.get("chat_completions_endpoint")
         return f"{self.base_url}/v1/chat/completions"
     
     def _validate_ip_port(self, ip_port: str) -> bool:

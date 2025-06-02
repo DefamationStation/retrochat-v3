@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from .code_block_formatter import CodeBlockFormatter # For type hint if needed
 
 from retrochat_app.core.config_manager import update_api_base_url # Add this import
+from retrochat_app.core import provider_manager
 
 def process_command(ui: 'TerminalUI', command_input: str) -> bool:
     """
@@ -29,6 +30,72 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
 
     command = parts[0].lower()
     args = parts[1:]
+    # Provider management commands
+    if command == "/provider":
+        if not args:
+            ui.console.print("Usage: /provider <list|add|edit|delete|select> [args]")
+            return False
+        sub = args[0].lower()
+        # List providers
+        if sub == "list":
+            provs, active = provider_manager.list_providers()
+            if not provs:
+                ui.console.print("No providers configured.")
+            else:
+                ui.console.print("Configured Providers:")
+                for p in provs:
+                    mark = "*" if p.get("name") == active else " "
+                    ui.console.print(f" {mark} {p.get('name')}")
+            return False
+        # Add provider
+        elif sub == "add":
+            if len(args) < 4:
+                ui.console.print("Usage: /provider add <name> <type> <api_base_url> [chat_completions_endpoint]")
+                return False
+            name, typ, base = args[1], args[2], args[3]
+            endpoint = args[4] if len(args) >= 5 else None
+            success, path = provider_manager.add_provider(name, typ, base, endpoint)
+            if success:
+                ui.console.print(f"Provider '{name}' added. Edit config at: {path}")
+            else:
+                ui.console.print(f"[red]Failed to add provider '{name}'[/red]")
+            return False
+        # Edit provider
+        elif sub == "edit":
+            if len(args) != 2:
+                ui.console.print("Usage: /provider edit <name>")
+                return False
+            name = args[1]
+            if provider_manager.edit_provider(name):
+                ui.console.print(f"Provider '{name}' edited successfully.")
+            else:
+                ui.console.print(f"[red]Failed to edit provider '{name}'[/red]")
+            return False
+        # Delete provider
+        elif sub == "delete":
+            if len(args) != 2:
+                ui.console.print("Usage: /provider delete <name>")
+                return False
+            name = args[1]
+            if provider_manager.delete_provider(name):
+                ui.console.print(f"Provider '{name}' deleted.")
+            else:
+                ui.console.print(f"[red]Failed to delete provider '{name}'[/red]")
+            return False
+        # Select provider
+        elif sub == "select":
+            if len(args) != 2:
+                ui.console.print("Usage: /provider select <name>")
+                return False
+            name = args[1]
+            if provider_manager.select_provider(name):
+                ui.console.print(f"Provider '{name}' selected as active.")
+            else:
+                ui.console.print(f"[red]Failed to select provider '{name}'[/red]")
+            return False
+        else:
+            ui.console.print(f"Unknown provider command: {sub}. Use list, add, edit, delete, select.")
+            return False
 
     if command == "/info":
         # Assuming show_system_info is now in display_handler and called from ui or passed console and llm_client
