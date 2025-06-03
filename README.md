@@ -311,6 +311,18 @@ Example configuration for the OpenRouter service:
 }
 ```
 
+Example configuration for a local Ollama instance:
+
+```json
+{
+    "name": "Local Ollama",
+    "type": "ollama",
+    "api_base_url": "http://localhost:11434",
+    "chat_completions_endpoint": "http://localhost:11434/api/generate",
+    "params": { "model": "llama3" }
+}
+```
+
 Provider configuration files are stored under `~/.config/Retrochat/providers/`.
 You can change the model without editing the JSON by running
 `/set model_name <model_id>`.
