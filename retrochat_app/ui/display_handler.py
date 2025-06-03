@@ -42,6 +42,7 @@ def show_help(console: Console):
     console.print("  /provider edit <name>          - Edit an existing provider's configuration in editor.")
     console.print("  /provider delete <name>        - Delete a provider.")
     console.print("  /provider select <name>        - Select a provider as active.")
+    console.print("  /provider set-header <name> <header_key> <header_value> - Set or update a header for a provider.")
     console.print("-" * 30)
 
 def show_system_info(console: Console, llm_client):
