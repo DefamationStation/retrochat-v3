@@ -1,4 +1,4 @@
-# RetroChat v3
+# RetroChat v3 - Comprehensive Code Documentation
 
 ## Overview
 
