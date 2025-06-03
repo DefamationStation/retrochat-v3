@@ -6,7 +6,11 @@ import re
 # Renamed original pattern for clarity, used by formatter for parsing display.
 # Group 1: language, Group 2: CodeID (optional), Group 3: code_content (may include trailing newline)
 CODE_BLOCK_EXTRACTION_PATTERN = re.compile(
-    r"```([a-zA-Z0-9_\-\.]*)(?:\s*\[CodeID:\s*(\d+)\s*\])?\s*\n?(.*?)```",
+    r"```\s*([a-zA-Z0-9_\-\.]*)"        # Optional whitespace then language
+    r"(?:\s*\[CodeID:\s*(\d+)\s*\])?"  # Optional CodeID tag
+    r"\s*\n?"                            # Optional spaces and newline
+    r"(.*?)"                              # Code content
+    r"```",                               # Closing fence
     re.DOTALL
 )
 
