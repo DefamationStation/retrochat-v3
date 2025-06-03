@@ -51,44 +51,101 @@ class LLMClient:
             headers.update(provider.get("headers", {}))
         return headers
 
+    def _build_ollama_payload(self, messages: List[Dict[str, Any]], stream: bool) -> Dict[str, Any]:
+        """Construct payload for an Ollama provider."""
+        params = self._get_current_params_payload()
+        system_prompt = params.pop("system_prompt", None)
+
+        parts = []
+        if system_prompt:
+            parts.append(system_prompt)
+        for m in messages:
+            role = m.get("role")
+            content = m.get("content")
+            if role and content:
+                parts.append(f"{role.capitalize()}: {content}")
+        prompt = "\n".join(parts)
+
+        options_map = {
+            "temperature": params.get("temperature"),
+            "top_p": params.get("top_p"),
+            "presence_penalty": params.get("presence_penalty"),
+            "frequency_penalty": params.get("frequency_penalty"),
+            "num_predict": params.get("max_tokens"),
+            "stop": params.get("stop_sequences"),
+        }
+        options = {k: v for k, v in options_map.items() if v is not None and v != []}
+
+        payload = {
+            "model": params.get("model"),
+            "prompt": prompt,
+            "stream": stream,
+        }
+        if options:
+            payload["options"] = options
+        return payload
+
     def send_chat_message_full_history(self, messages: List[Dict[str, Any]]) -> Optional[str]:
         """Sends a chat request with the complete message history (non-streaming)."""
         if not messages:
             logger.error("Message list cannot be empty")
             return None
 
-        payload = self._get_current_params_payload()
-        payload["messages"] = messages
-        payload["stream"] = False  # Ensure stream is False for this method
+        provider = provider_manager.get_active_provider()
+        provider_type = provider.get("type") if provider else None
 
         headers = self._build_headers()
 
-        try:
-            response = requests.post(
-                self.endpoint, 
-                headers=headers, 
-                data=json.dumps(payload), 
-                stream=False,
-                timeout=self.config.api.timeout
-            )
-            response.raise_for_status()
-            response_data = response.json()
+        if provider_type == "ollama":
+            payload = self._build_ollama_payload(messages, stream=False)
+            endpoint = provider.get("chat_completions_endpoint") if provider else None
+            endpoint = endpoint or "http://localhost:11434/api/generate"
+            try:
+                response = requests.post(
+                    endpoint,
+                    headers=headers,
+                    data=json.dumps(payload),
+                    stream=False,
+                    timeout=self.config.api.timeout,
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("response")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error during LLM communication: {e}")
+                return None
+            except json.JSONDecodeError:
+                logger.error("Failed to decode JSON response")
+                return None
+        else:
+            payload = self._get_current_params_payload()
+            payload["messages"] = messages
+            payload["stream"] = False
+
+            try:
+                response = requests.post(
+                    self.endpoint,
+                    headers=headers,
+                    data=json.dumps(payload),
+                    stream=False,
+                    timeout=self.config.api.timeout,
+                )
+                response.raise_for_status()
+                response_data = response.json()
+
+                if response_data.get("choices") and len(response_data["choices"]) > 0:
+                    if "message" in response_data["choices"][0] and "content" in response_data["choices"][0]["message"]:
+                        return response_data["choices"][0]["message"]["content"]
+                    elif "delta" in response_data["choices"][0] and "content" in response_data["choices"][0]["delta"]:
+                        return response_data["choices"][0]["delta"]["content"]
+                return None
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error during LLM communication: {e}")
+                return None
+            except json.JSONDecodeError:
+                logger.error(f"Failed to decode JSON response: {response.text}")
+                return None
             
-            if response_data.get("choices") and len(response_data["choices"]) > 0:
-                # Check if 'message' key exists and has 'content'
-                if "message" in response_data["choices"][0] and "content" in response_data["choices"][0]["message"]:
-                    return response_data["choices"][0]["message"]["content"]
-                # Fallback for models that might structure response differently
-                elif "delta" in response_data["choices"][0] and "content" in response_data["choices"][0]["delta"]:
-                    return response_data["choices"][0]["delta"]["content"]
-            return None
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error during LLM communication: {e}")
-            return None
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to decode JSON response: {response.text}")
-            return None
 
     def stream_chat_message(self, messages: List[Dict[str, Any]]):
         """Sends a chat request and streams the response."""
@@ -97,44 +154,79 @@ class LLMClient:
             yield ""
             return
 
-        payload = self._get_current_params_payload()
-        payload["messages"] = messages
-        payload["stream"] = True  # Ensure stream is True for this method
+        provider = provider_manager.get_active_provider()
+        provider_type = provider.get("type") if provider else None
 
         headers = self._build_headers()
 
-        try:
-            with requests.post(
-                self.endpoint, 
-                headers=headers, 
-                data=json.dumps(payload), 
-                stream=True,
-                timeout=self.config.api.timeout
-            ) as response:
-                response.raise_for_status()
-                for line in response.iter_lines():
-                    if line:
-                        decoded_line = line.decode('utf-8')
-                        if decoded_line.startswith("data: "):
-                            json_content = decoded_line[len("data: "):]
-                            if json_content.strip() == "[DONE]":
-                                break
+        if provider_type == "ollama":
+            payload = self._build_ollama_payload(messages, stream=True)
+            endpoint = provider.get("chat_completions_endpoint") if provider else None
+            endpoint = endpoint or "http://localhost:11434/api/generate"
+            try:
+                with requests.post(
+                    endpoint,
+                    headers=headers,
+                    data=json.dumps(payload),
+                    stream=True,
+                    timeout=self.config.api.timeout,
+                ) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if line:
                             try:
-                                data = json.loads(json_content)
-                                if data.get("choices") and len(data["choices"]) > 0:
-                                    delta = data["choices"][0].get("delta", {})
-                                    content = delta.get("content")
-                                    if content:
-                                        yield content
+                                data = json.loads(line.decode("utf-8"))
                             except json.JSONDecodeError:
-                                logger.error(f"Failed to decode JSON stream chunk: {json_content}")
+                                logger.error(f"Failed to decode JSON stream chunk: {line}")
                                 continue
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error during LLM communication: {e}")
-            yield ""
-        except Exception as e:
-            logger.error(f"Unexpected error during streaming: {e}")
-            yield ""
+                            text = data.get("response")
+                            if text:
+                                yield text
+                            if data.get("done"):
+                                break
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error during LLM communication: {e}")
+                yield ""
+            except Exception as e:
+                logger.error(f"Unexpected error during streaming: {e}")
+                yield ""
+        else:
+            payload = self._get_current_params_payload()
+            payload["messages"] = messages
+            payload["stream"] = True
+
+            try:
+                with requests.post(
+                    self.endpoint,
+                    headers=headers,
+                    data=json.dumps(payload),
+                    stream=True,
+                    timeout=self.config.api.timeout,
+                ) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if line:
+                            decoded_line = line.decode('utf-8')
+                            if decoded_line.startswith("data: "):
+                                json_content = decoded_line[len("data: "):]
+                                if json_content.strip() == "[DONE]":
+                                    break
+                                try:
+                                    data = json.loads(json_content)
+                                    if data.get("choices") and len(data["choices"]) > 0:
+                                        delta = data["choices"][0].get("delta", {})
+                                        content = delta.get("content")
+                                        if content:
+                                            yield content
+                                except json.JSONDecodeError:
+                                    logger.error(f"Failed to decode JSON stream chunk: {json_content}")
+                                    continue
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error during LLM communication: {e}")
+                yield ""
+            except Exception as e:
+                logger.error(f"Unexpected error during streaming: {e}")
+                yield ""
 
     def get_params(self) -> Dict[str, Any]:
         """Returns a dictionary of all current model and API parameters by fetching from config."""

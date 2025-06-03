@@ -99,11 +99,18 @@ def add_provider(name: str, type: str, api_base_url: str,
     file_path = os.path.join(PROVIDERS_DIR, filename)
 
     # Build default config
+    # Determine default endpoint based on provider type
+    if not chat_completions_endpoint:
+        if type == "ollama":
+            chat_completions_endpoint = f"{api_base_url.rstrip('/')}/api/generate"
+        else:
+            chat_completions_endpoint = f"{api_base_url.rstrip('/')}/v1/chat/completions"
+
     cfg = {
         "name": name,
         "type": type,
         "api_base_url": api_base_url,
-        "chat_completions_endpoint": chat_completions_endpoint or f"{api_base_url}/v1/chat/completions",
+        "chat_completions_endpoint": chat_completions_endpoint,
         "params": params or {},
         "message_format": message_format or "",
         "response_format": response_format or "",
