@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 
 # Use the new configuration system
 from retrochat_app.core.config import get_config
-from retrochat_app.core import config_manager
+from retrochat_app.core import config_manager, provider_manager
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +36,20 @@ class LLMClient:
         logger.info(f"Endpoint updated to: {self.endpoint}")
 
     def _get_current_params_payload(self) -> Dict[str, Any]:
-        """Helper to get payload-ready parameters from current config."""
-        return self.config.model.get_api_parameters()
+        """Helper to get payload-ready parameters merging provider defaults."""
+        user_params = self.config.model.get_api_parameters()
+        provider = provider_manager.get_active_provider()
+        provider_params = provider.get("params", {}) if provider else {}
+        # Provider defaults are overridden by user-specified parameters
+        return {**provider_params, **user_params}
+
+    def _build_headers(self) -> Dict[str, str]:
+        """Construct request headers merged with active provider headers."""
+        headers = {"Content-Type": "application/json"}
+        provider = provider_manager.get_active_provider()
+        if provider:
+            headers.update(provider.get("headers", {}))
+        return headers
 
     def send_chat_message_full_history(self, messages: List[Dict[str, Any]]) -> Optional[str]:
         """Sends a chat request with the complete message history (non-streaming)."""
@@ -49,7 +61,7 @@ class LLMClient:
         payload["messages"] = messages
         payload["stream"] = False  # Ensure stream is False for this method
 
-        headers = {"Content-Type": "application/json"}
+        headers = self._build_headers()
 
         try:
             response = requests.post(
@@ -89,7 +101,7 @@ class LLMClient:
         payload["messages"] = messages
         payload["stream"] = True  # Ensure stream is True for this method
 
-        headers = {"Content-Type": "application/json"}
+        headers = self._build_headers()
 
         try:
             with requests.post(
