@@ -178,7 +178,8 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
         history = ui.session_manager.get_conversation_history()
         if not history: ui.console.print("Conversation history is empty for the current session.")
         else:
-            ui.console.print("\\\\nConversation History:")
+            # Display a blank line before the history header
+            ui.console.print("\nConversation History:")
             for msg in history:
                 ui.console.print(f"  {msg['role'].capitalize()}: {msg['content']}")
             ui.console.print("-" * 30)
