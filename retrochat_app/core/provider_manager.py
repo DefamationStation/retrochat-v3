@@ -99,11 +99,21 @@ def add_provider(name: str, type: str, api_base_url: str,
     file_path = os.path.join(PROVIDERS_DIR, filename)
 
     # Build default config
+    # Determine default chat completions endpoint
+    endpoint = chat_completions_endpoint
+    if not endpoint:
+        base = api_base_url.rstrip('/')
+        if base.endswith('/v1'):
+            endpoint_base = base
+        else:
+            endpoint_base = f"{base}/v1"
+        endpoint = f"{endpoint_base}/chat/completions"
+
     cfg = {
         "name": name,
         "type": type,
         "api_base_url": api_base_url,
-        "chat_completions_endpoint": chat_completions_endpoint or f"{api_base_url}/v1/chat/completions",
+        "chat_completions_endpoint": endpoint,
         "params": params or {},
         "message_format": message_format or "",
         "response_format": response_format or "",
