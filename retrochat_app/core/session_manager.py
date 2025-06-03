@@ -151,31 +151,43 @@ class SessionManager:
         
         return self.current_session_id
 
-    def add_message_to_history(self, role: str, content: str):
+    def add_message_to_history(self, role: str, content: str) -> str:
         """
-        Adds a message to the history. If it's an assistant message,
-        it processes the content for code blocks using the centralized utility,
-        which assigns global IDs, stores them in session_data, and embeds ID tags.
+        Adds a message to the history and returns the stored content.
+
+        Assistant messages are processed for code blocks using the centralized
+        utility which assigns global IDs, stores them in ``session_data`` and
+        embeds ID tags. The processed content (with embedded IDs) is returned so
+        callers can display the exact text that was stored.
         """
+
+        stored_content = content
+
         if role == "assistant":
-            # Use the centralized function. It updates self.current_session_data directly.
+            # Use the centralized function. It updates ``self.current_session_data`` directly.
             processed_content, _ = process_and_assign_code_block_ids(
                 content,
-                self.current_session_data # Pass the whole session_data dict
+                self.current_session_data  # Pass the whole session_data dict
             )
-            # new_blocks are already updated in self.current_session_data["code_blocks"]
-            # self.current_session_data["next_code_block_global_id"] is also updated by the function
-            
-            self.current_session_data.setdefault("conversation_history", []).append({"role": role, "content": processed_content})
-            # No need to update code_blocks or next_code_block_global_id here, it's done by the utility.
-        else: # User messages or system messages
-            self.current_session_data.setdefault("conversation_history", []).append({"role": role, "content": content})
-        
+            stored_content = processed_content
+
+            # new_blocks are already updated in ``self.current_session_data['code_blocks']``
+            # ``next_code_block_global_id`` is also updated by the utility
+            self.current_session_data.setdefault("conversation_history", []).append(
+                {"role": role, "content": processed_content}
+            )
+        else:  # User messages or system messages
+            self.current_session_data.setdefault("conversation_history", []).append(
+                {"role": role, "content": content}
+            )
+
         # Auto-save after each message
         try:
             self.save_session()
         except Exception as e:
             logging.error(f"Failed to save session after adding message: {e}")
+
+        return stored_content
 
     def get_current_session_history(self) -> list:
         """Returns the conversation history of the current session."""
