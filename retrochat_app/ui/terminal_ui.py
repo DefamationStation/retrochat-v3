@@ -180,8 +180,10 @@ class TerminalUI:
                         resp = self.llm_client.send_chat_message_full_history(api_msgs)
                     assistant_text = resp or "Error: No response from LLM."
 
-                # store reply
-                self.session_manager.add_message_to_history("assistant", assistant_text)
+                # store reply and get the processed version with CodeID tags
+                stored_assistant_text = self.session_manager.add_message_to_history(
+                    "assistant", assistant_text
+                )
 
                 # ── pretty-print reply (skip plain text if we already streamed it) ─
                 if assistant_text.startswith("Error:"):
@@ -196,12 +198,12 @@ class TerminalUI:
                         + m.group(1).strip()
                         + colorama.Style.RESET_ALL
                         + " ",
-                        assistant_text,
+                        stored_assistant_text,
                         flags=re.DOTALL,
                     ).strip()
                     if self.show_thoughts
                     else re.sub(
-                        r"<think>.*?</think>", "", assistant_text, flags=re.DOTALL
+                        r"<think>.*?</think>", "", stored_assistant_text, flags=re.DOTALL
                     ).strip()
                 )
 
