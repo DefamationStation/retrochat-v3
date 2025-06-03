@@ -290,6 +290,31 @@ CodeID 1
 2. Add rendering logic to `terminal_ui.py`
 3. Update text processing in `text_processing_utils.py`
 
+## Adding Providers
+
+RetroChat supports multiple backend providers for API requests. Use
+`/provider add <name> <type> <api_base_url> [chat_endpoint]` to create a new
+provider configuration. The command writes a JSON file and opens it in your
+default editor for customization. Activate a provider with
+`/provider select <name>` once the configuration is saved.
+
+Example configuration for the OpenRouter service:
+
+```json
+{
+    "name": "OpenRouter",
+    "type": "openai",
+    "api_base_url": "https://openrouter.ai/api/v1",
+    "chat_completions_endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "headers": { "Authorization": "Bearer <OPENROUTER_API_KEY>" },
+    "params": { "model": "deepseek/deepseek-chat-v3-0324:free" }
+}
+```
+
+Provider configuration files are stored under `~/.config/Retrochat/providers/`.
+You can change the model without editing the JSON by running
+`/set model_name <model_id>`.
+
 ## Dependencies
 
 ### Core Dependencies
