@@ -210,6 +210,35 @@ def select_provider(name: str):
     return False
 
 
+def set_provider_header(name: str, header_key: str, header_value: str) -> bool:
+    """Set or update a header for the specified provider."""
+    index = load_index()
+    for entry in index.get("providers", []):
+        if entry.get("name") == name:
+            file_path = os.path.join(PROVIDERS_DIR, entry.get("file"))
+            try:
+                with open(file_path, "r") as f:
+                    cfg = json.load(f)
+            except Exception as e:
+                logger.error(f"Error reading provider config for {name}: {e}")
+                return False
+
+            if not isinstance(cfg.get("headers"), dict):
+                cfg["headers"] = {}
+
+            cfg["headers"][header_key] = header_value
+
+            try:
+                with open(file_path, "w") as f:
+                    json.dump(cfg, f, indent=4)
+                return True
+            except Exception as e:
+                logger.error(f"Error saving provider config for {name}: {e}")
+                return False
+    logger.error(f"Provider '{name}' not found.")
+    return False
+
+
 def _launch_editor(file_path: str):
     """Launch the system default editor to edit the provider config."""
     system = platform.system()
