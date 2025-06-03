@@ -84,7 +84,8 @@ def add_provider(name: str, type: str, api_base_url: str,
                  chat_completions_endpoint: str = None,
                  params: dict = None,
                  message_format: str = None,
-                 response_format: str = None):
+                 response_format: str = None,
+                 headers: dict = None):
     """Add a new provider and open config in editor."""
     index = load_index()
     # Prevent duplicate names
@@ -105,7 +106,8 @@ def add_provider(name: str, type: str, api_base_url: str,
         "chat_completions_endpoint": chat_completions_endpoint or f"{api_base_url}/v1/chat/completions",
         "params": params or {},
         "message_format": message_format or "",
-        "response_format": response_format or ""
+        "response_format": response_format or "",
+        "headers": headers or {}
     }
     # Write config file
     try:
@@ -131,6 +133,9 @@ def add_provider(name: str, type: str, api_base_url: str,
             if r not in edited:
                 logger.error(f"Edited config missing required key: {r}")
                 return False, file_path
+        if "headers" in edited and not isinstance(edited["headers"], dict):
+            logger.error("Edited config 'headers' must be a dictionary if present")
+            return False, file_path
     except Exception as e:
         logger.error(f"Error validating edited config: {e}")
         return False, file_path
@@ -155,6 +160,9 @@ def edit_provider(name: str):
                         if r not in edited:
                             logger.error(f"Edited config missing key: {r}")
                             return False
+                    if "headers" in edited and not isinstance(edited["headers"], dict):
+                        logger.error("Edited config 'headers' must be a dictionary if present")
+                        return False
                     return True
                 except Exception as e:
                     logger.error(f"Error validating config after edit: {e}")
