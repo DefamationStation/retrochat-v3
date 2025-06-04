@@ -102,11 +102,11 @@ def add_provider(name: str, type: str, api_base_url: str,
     # Determine default chat completions endpoint
     endpoint = chat_completions_endpoint
     if not endpoint:
-        base = api_base_url.rstrip('/')
-        if base.endswith('/v1'):
-            endpoint_base = base
+        api_base_trimmed = api_base_url.rstrip('/')
+        if api_base_trimmed.endswith('/v1'):
+            endpoint_base = api_base_trimmed
         else:
-            endpoint_base = f"{base}/v1"
+            endpoint_base = f"{api_base_trimmed}/v1"
         endpoint = f"{endpoint_base}/chat/completions"
 
     cfg = {
