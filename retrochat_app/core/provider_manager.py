@@ -102,7 +102,7 @@ def add_provider(name: str, type: str, api_base_url: str,
     # Determine default chat completions endpoint
     if not chat_completions_endpoint:
         if type == "ollama":
-            chat_completions_endpoint = f"{api_base_url.rstrip('/')}/api/generate"
+            chat_completions_endpoint = f"{api_base_url.rstrip('/')}/api/chat"
         else:
             api_base_trimmed = api_base_url.rstrip('/')
             if api_base_trimmed.endswith('/v1'):

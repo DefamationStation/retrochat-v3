@@ -53,6 +53,23 @@ top_p = 0.95 # Nucleus sampling: 0.1 to 1.0
 presence_penalty = 0.0 # -2.0 to 2.0
 frequency_penalty = 0.0 # -2.0 to 2.0
 stop_sequences = [] # List of strings, e.g., ["\\nUser:", "Observation:"]
+# Additional Ollama-specific parameters
+num_ctx = None
+top_k = None
+min_p = None
+typical_p = None
+repeat_penalty = None
+repeat_last_n = None
+seed = None
+num_keep = None
+penalize_newline = None
+numa = None
+num_batch = None
+num_gpu = None
+main_gpu = None
+use_mmap = None
+num_thread = None
+keep_alive = None
 
 # --- Known Model Parameters ---
 KNOWN_MODEL_PARAMS = {
@@ -60,11 +77,27 @@ KNOWN_MODEL_PARAMS = {
     "temperature": float,
     "max_tokens": int,
     "stream": bool,
-    "system_prompt": (str, type(None)), # Allow None, ensure empty string becomes None
+    "system_prompt": (str, type(None)),
     "top_p": float,
     "presence_penalty": float,
     "frequency_penalty": float,
     "stop_sequences": list,
+    "num_ctx": (int, type(None)),
+    "top_k": (int, type(None)),
+    "min_p": (float, type(None)),
+    "typical_p": (float, type(None)),
+    "repeat_penalty": (float, type(None)),
+    "repeat_last_n": (int, type(None)),
+    "seed": (int, type(None)),
+    "num_keep": (int, type(None)),
+    "penalize_newline": (bool, type(None)),
+    "numa": (bool, type(None)),
+    "num_batch": (int, type(None)),
+    "num_gpu": (int, type(None)),
+    "main_gpu": (int, type(None)),
+    "use_mmap": (bool, type(None)),
+    "num_thread": (int, type(None)),
+    "keep_alive": (str, type(None)),
 }
 
 # --- Parameter Type Validation and Conversion ---
@@ -132,6 +165,22 @@ def get_default_settings():
         "presence_penalty": presence_penalty,
         "frequency_penalty": frequency_penalty,
         "stop_sequences": stop_sequences.copy(),
+        "num_ctx": num_ctx,
+        "top_k": top_k,
+        "min_p": min_p,
+        "typical_p": typical_p,
+        "repeat_penalty": repeat_penalty,
+        "repeat_last_n": repeat_last_n,
+        "seed": seed,
+        "num_keep": num_keep,
+        "penalize_newline": penalize_newline,
+        "numa": numa,
+        "num_batch": num_batch,
+        "num_gpu": num_gpu,
+        "main_gpu": main_gpu,
+        "use_mmap": use_mmap,
+        "num_thread": num_thread,
+        "keep_alive": keep_alive,
     }
 
 def load_user_settings() -> dict:

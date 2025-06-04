@@ -327,6 +327,11 @@ Provider configuration files are stored under `~/.config/Retrochat/providers/`.
 You can change the model without editing the JSON by running
 `/set model_name <model_id>`.
 
+Internally each provider is handled by a small class implementing payload
+construction and response parsing. The active provider's type (for example
+`openai` or `ollama`) selects the appropriate handler allowing new providers to
+be added without modifying `LLMClient`.
+
 ### Storing API Keys
 
 After a provider is added you may need to store authentication headers such as
@@ -348,7 +353,7 @@ The following JSON config connects to an Ollama instance running locally:
 ```json
 {
     "name": "OllamaLocal",
-    "type": "openai",
+    "type": "ollama",
     "api_base_url": "http://localhost:11434",
     "chat_completions_endpoint": "http://localhost:11434/api/chat",
     "headers": {},
@@ -356,7 +361,7 @@ The following JSON config connects to an Ollama instance running locally:
 }
 ```
 
-Create it with `/provider add OllamaLocal openai http://localhost:11434
+Create it with `/provider add OllamaLocal ollama http://localhost:11434
 http://localhost:11434/api/chat` and then select it using `/provider select
 OllamaLocal`.
 
