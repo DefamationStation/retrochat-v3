@@ -6,7 +6,7 @@ if not defined VIRTUAL_ENV (
     powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force"
     
     echo Activating virtual environment...
-    powershell -Command "& '.\\.venv\\Scripts\\Activate.ps1'; python main.py"
+    powershell -Command "& '.\\venv\\Scripts\\Activate.ps1'; python main.py"
 ) else (
     echo Virtual environment already active.
     echo Retrochat initialized.
