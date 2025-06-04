@@ -14,7 +14,6 @@ def test_add_provider_base_with_v1(monkeypatch, tmp_path):
 
     # Reload modules so APP_CONFIG_DIR picks up the temp path
     import retrochat_app.core.config_manager as config_manager
-    import importlib
     importlib.reload(config_manager)
     import retrochat_app.core.provider_manager as provider_manager
     importlib.reload(provider_manager)
