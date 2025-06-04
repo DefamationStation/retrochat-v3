@@ -100,20 +100,22 @@ def add_provider(name: str, type: str, api_base_url: str,
 
     # Build default config
     # Determine default chat completions endpoint
-    endpoint = chat_completions_endpoint
-    if not endpoint:
-        api_base_trimmed = api_base_url.rstrip('/')
-        if api_base_trimmed.endswith('/v1'):
-            endpoint_base = api_base_trimmed
+    if not chat_completions_endpoint:
+        if type == "ollama":
+            chat_completions_endpoint = f"{api_base_url.rstrip('/')}/api/generate"
         else:
-            endpoint_base = f"{api_base_trimmed}/v1"
-        endpoint = f"{endpoint_base}/chat/completions"
+            api_base_trimmed = api_base_url.rstrip('/')
+            if api_base_trimmed.endswith('/v1'):
+                endpoint_base = api_base_trimmed
+            else:
+                endpoint_base = f"{api_base_trimmed}/v1"
+            chat_completions_endpoint = f"{endpoint_base}/chat/completions"
 
     cfg = {
         "name": name,
         "type": type,
         "api_base_url": api_base_url,
-        "chat_completions_endpoint": endpoint,
+        "chat_completions_endpoint": chat_completions_endpoint,
         "params": params or {},
         "message_format": message_format or "",
         "response_format": response_format or "",
@@ -216,6 +218,35 @@ def select_provider(name: str):
             index["active"] = name
             save_index(index)
             return True
+    logger.error(f"Provider '{name}' not found.")
+    return False
+
+
+def set_provider_header(name: str, header_key: str, header_value: str) -> bool:
+    """Set or update a header for the specified provider."""
+    index = load_index()
+    for entry in index.get("providers", []):
+        if entry.get("name") == name:
+            file_path = os.path.join(PROVIDERS_DIR, entry.get("file"))
+            try:
+                with open(file_path, "r") as f:
+                    cfg = json.load(f)
+            except Exception as e:
+                logger.error(f"Error reading provider config for {name}: {e}")
+                return False
+
+            if not isinstance(cfg.get("headers"), dict):
+                cfg["headers"] = {}
+
+            cfg["headers"][header_key] = header_value
+
+            try:
+                with open(file_path, "w") as f:
+                    json.dump(cfg, f, indent=4)
+                return True
+            except Exception as e:
+                logger.error(f"Error saving provider config for {name}: {e}")
+                return False
     logger.error(f"Provider '{name}' not found.")
     return False
 

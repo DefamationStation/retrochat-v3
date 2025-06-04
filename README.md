@@ -311,9 +311,54 @@ Example configuration for the OpenRouter service:
 }
 ```
 
+Example configuration for a local Ollama instance:
+
+```json
+{
+    "name": "Local Ollama",
+    "type": "ollama",
+    "api_base_url": "http://localhost:11434",
+    "chat_completions_endpoint": "http://localhost:11434/api/generate",
+    "params": { "model": "llama3" }
+}
+```
+
 Provider configuration files are stored under `~/.config/Retrochat/providers/`.
 You can change the model without editing the JSON by running
 `/set model_name <model_id>`.
+
+### Storing API Keys
+
+After a provider is added you may need to store authentication headers such as
+API keys. Use `/provider set-header <name> <header> <value>` to add or update a
+header in the provider's JSON file. For example:
+
+```bash
+/provider set-header OpenRouter Authorization "Bearer sk-..."
+```
+
+The key is persisted in `~/.config/Retrochat/providers/` so it is applied on
+every request. Models can still be switched at any time with `/set model_name
+<id>`.
+
+### Example Ollama Provider
+
+The following JSON config connects to an Ollama instance running locally:
+
+```json
+{
+    "name": "OllamaLocal",
+    "type": "openai",
+    "api_base_url": "http://localhost:11434",
+    "chat_completions_endpoint": "http://localhost:11434/api/chat",
+    "headers": {},
+    "params": { "model": "llama3" }
+}
+```
+
+Create it with `/provider add OllamaLocal openai http://localhost:11434
+http://localhost:11434/api/chat` and then select it using `/provider select
+OllamaLocal`.
 
 ## Dependencies
 

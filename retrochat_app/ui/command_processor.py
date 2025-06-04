@@ -33,7 +33,7 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
     # Provider management commands
     if command == "/provider":
         if not args:
-            ui.console.print("Usage: /provider <list|add|edit|delete|select> [args]")
+            ui.console.print("Usage: /provider <list|add|edit|delete|select|set-header> [args]")
             return False
         sub = args[0].lower()
         # List providers
@@ -93,8 +93,19 @@ def process_command(ui: 'TerminalUI', command_input: str) -> bool:
             else:
                 ui.console.print(f"[red]Failed to select provider '{name}'[/red]")
             return False
+        elif sub == "set-header":
+            if len(args) < 4:
+                ui.console.print("Usage: /provider set-header <name> <header_key> <header_value>")
+                return False
+            name, header_key = args[1], args[2]
+            header_value = " ".join(args[3:])
+            if provider_manager.set_provider_header(name, header_key, header_value):
+                ui.console.print(f"Header '{header_key}' set for provider '{name}'.")
+            else:
+                ui.console.print(f"[red]Failed to set header for provider '{name}'[/red]")
+            return False
         else:
-            ui.console.print(f"Unknown provider command: {sub}. Use list, add, edit, delete, select.")
+            ui.console.print(f"Unknown provider command: {sub}. Use list, add, edit, delete, select, set-header.")
             return False
 
     if command == "/info":
