@@ -85,6 +85,72 @@ class ModelConfig:
     @property
     def stop_sequences(self) -> List[str]:
         return self._settings.get("stop_sequences", [])
+
+    # Additional optional parameters used by some providers
+
+    @property
+    def num_ctx(self) -> Optional[int]:
+        return self._settings.get("num_ctx")
+
+    @property
+    def top_k(self) -> Optional[int]:
+        return self._settings.get("top_k")
+
+    @property
+    def min_p(self) -> Optional[float]:
+        return self._settings.get("min_p")
+
+    @property
+    def typical_p(self) -> Optional[float]:
+        return self._settings.get("typical_p")
+
+    @property
+    def repeat_penalty(self) -> Optional[float]:
+        return self._settings.get("repeat_penalty")
+
+    @property
+    def repeat_last_n(self) -> Optional[int]:
+        return self._settings.get("repeat_last_n")
+
+    @property
+    def seed(self) -> Optional[int]:
+        return self._settings.get("seed")
+
+    @property
+    def num_keep(self) -> Optional[int]:
+        return self._settings.get("num_keep")
+
+    @property
+    def penalize_newline(self) -> Optional[bool]:
+        return self._settings.get("penalize_newline")
+
+    @property
+    def numa(self) -> Optional[bool]:
+        return self._settings.get("numa")
+
+    @property
+    def num_batch(self) -> Optional[int]:
+        return self._settings.get("num_batch")
+
+    @property
+    def num_gpu(self) -> Optional[int]:
+        return self._settings.get("num_gpu")
+
+    @property
+    def main_gpu(self) -> Optional[int]:
+        return self._settings.get("main_gpu")
+
+    @property
+    def use_mmap(self) -> Optional[bool]:
+        return self._settings.get("use_mmap")
+
+    @property
+    def num_thread(self) -> Optional[int]:
+        return self._settings.get("num_thread")
+
+    @property
+    def keep_alive(self) -> Optional[str]:
+        return self._settings.get("keep_alive")
     
     def get_api_parameters(self) -> Dict[str, Any]:
         """Get parameters for API calls."""
@@ -103,7 +169,30 @@ class ModelConfig:
         
         if self.stop_sequences:
             params["stop"] = self.stop_sequences
-            
+
+        # Optional advanced parameters
+        optional_map = {
+            "num_ctx": self.num_ctx,
+            "top_k": self.top_k,
+            "min_p": self.min_p,
+            "typical_p": self.typical_p,
+            "repeat_penalty": self.repeat_penalty,
+            "repeat_last_n": self.repeat_last_n,
+            "seed": self.seed,
+            "num_keep": self.num_keep,
+            "penalize_newline": self.penalize_newline,
+            "numa": self.numa,
+            "num_batch": self.num_batch,
+            "num_gpu": self.num_gpu,
+            "main_gpu": self.main_gpu,
+            "use_mmap": self.use_mmap,
+            "num_thread": self.num_thread,
+            "keep_alive": self.keep_alive,
+        }
+        for key, value in optional_map.items():
+            if value is not None:
+                params[key] = value
+
         return params
 
 
