@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Python Documentation Sync",
+  "description": "Monitors all Python source files and configuration files in the repository and triggers documentation updates when changes are detected",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      "*.py",
+      "config.json",
+      "requirements.txt"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The Python source code or configuration files have been modified. Please review the changes and update the documentation accordingly. This may include updating the README.md file or creating/updating documentation in a docs folder if one exists. Focus on keeping the documentation in sync with any API changes, new features, configuration options, or architectural modifications."
+  }
+}
