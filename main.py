@@ -6,7 +6,23 @@ from chat import Chat
 from chat_manager import ChatManager
 
 def generate_chat_id():
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=5))
+    import os
+    import re
+    chats_dir = 'chats'
+    if not os.path.exists(chats_dir):
+        os.makedirs(chats_dir)
+    existing = set()
+    pattern = re.compile(r'^chat_(\d+)$')
+    for fname in os.listdir(chats_dir):
+        if fname.endswith('.json'):
+            base = fname[:-5]
+            m = pattern.match(base)
+            if m:
+                existing.add(int(m.group(1)))
+    n = 1
+    while n in existing:
+        n += 1
+    return f'chat_{n}'
 
 class CommandRegistry:
     """Registry for managing slash commands with descriptions"""
@@ -47,7 +63,7 @@ def main():
     cmd_registry = CommandRegistry()
     
     # Command handler functions
-    def cmd_list_models():
+    def cmd_model_list():
         """List and select available AI models"""
         models = model_manager.get_models()
         for i, model in enumerate(models.data):
@@ -84,7 +100,7 @@ def main():
             print("Invalid command. Use /set system <prompt>")
         return True
     
-    def cmd_new():
+    def cmd_chat_new():
         """Start a new chat session"""
         nonlocal current_chat, history
         current_chat = generate_chat_id()
@@ -92,7 +108,7 @@ def main():
         print(f"Started new chat: {current_chat}")
         return True
     
-    def cmd_save(chat_name):
+    def cmd_chat_save(chat_name):
         """Save the current chat with a given name"""
         nonlocal current_chat
         try:
@@ -103,10 +119,10 @@ def main():
                 current_chat = chat_name
                 print(f"Chat saved as {chat_name}")
         except Exception:
-            print("Invalid command. Use /save <chat_name>")
+            print("Invalid command. Use /chat save <chat_name>")
         return True
     
-    def cmd_load(chat_name):
+    def cmd_chat_load(chat_name):
         """Load a previously saved chat"""
         nonlocal current_chat, history
         try:
@@ -115,13 +131,19 @@ def main():
                 history = loaded_history
                 current_chat = chat_name
                 print(f"Chat {chat_name} loaded.")
+                print("--- Conversation History ---")
+                for msg in history:
+                    role = msg.get("role", "?")
+                    content = msg.get("content", "")
+                    print(f"[{role}] {content}")
+                print("---------------------------")
             else:
                 print("Chat not found.")
         except Exception:
-            print("Invalid command. Use /load <chat_name>")
+            print("Invalid command. Use /chat load <chat_name>")
         return True
     
-    def cmd_delete(chat_name):
+    def cmd_chat_delete(chat_name):
         """Delete a saved chat"""
         nonlocal current_chat, history
         try:
@@ -133,10 +155,10 @@ def main():
             else:
                 print("Chat not found.")
         except Exception:
-            print("Invalid command. Use /delete <chat_name>")
+            print("Invalid command. Use /chat delete <chat_name>")
         return True
     
-    def cmd_list_chats():
+    def cmd_chat_list():
         """List all saved chats"""
         chats = chat_manager.list_chats()
         if chats:
@@ -145,6 +167,12 @@ def main():
                 print(chat_name)
         else:
             print("No chats found.")
+        return True
+    def cmd_chat_reset():
+        """Clear the current chat's conversation history"""
+        nonlocal history
+        history = []
+        print("Current chat history cleared.")
         return True
     
     def cmd_help():
@@ -159,15 +187,16 @@ def main():
         """Exit the chat application"""
         return False
     
-    # Register all commands
-    cmd_registry.register("/list models", "List and select available AI models", cmd_list_models)
+    # Register all commands (cohesive style)
+    cmd_registry.register("/model list", "List and select available AI models", cmd_model_list)
     cmd_registry.register("/set stream", "Enable or disable streaming responses (true/false)", cmd_set_stream)
     cmd_registry.register("/set system", "Set the system prompt for the AI", cmd_set_system)
-    cmd_registry.register("/new", "Start a new chat session", cmd_new)
-    cmd_registry.register("/save", "Save the current chat with a given name", cmd_save)
-    cmd_registry.register("/load", "Load a previously saved chat", cmd_load)
-    cmd_registry.register("/delete", "Delete a saved chat", cmd_delete)
-    cmd_registry.register("/list chats", "List all saved chats", cmd_list_chats)
+    cmd_registry.register("/chat new", "Start a new chat session", cmd_chat_new)
+    cmd_registry.register("/chat save", "Save the current chat with a given name", cmd_chat_save)
+    cmd_registry.register("/chat load", "Load a previously saved chat", cmd_chat_load)
+    cmd_registry.register("/chat delete", "Delete a saved chat", cmd_chat_delete)
+    cmd_registry.register("/chat reset", "Clear the current chats conversation history", cmd_chat_reset)
+    cmd_registry.register("/chat list", "List all saved chats", cmd_chat_list)
     cmd_registry.register("/help", "Show this help message with all available commands", cmd_help)
     cmd_registry.register("/exit", "Exit the chat application", cmd_exit)
 
@@ -177,19 +206,20 @@ def main():
         # Check if input is a command (starts with /)
         if user_input.startswith("/"):
             command_handled = False
-            
-            # Handle commands
-            if user_input == "/list models":
-                cmd_registry.execute_command("/list models")
+            # /model list
+            if user_input.strip() == "/model list":
+                cmd_registry.execute_command("/model list")
                 command_handled = True
+            # /set stream <value>
             elif user_input.startswith("/set stream "):
                 try:
-                    value = user_input.split(" ")[2]
+                    value = user_input.split(" ", 2)[2]
                     cmd_registry.execute_command("/set stream", value)
                     command_handled = True
                 except IndexError:
                     print("Invalid command. Use /set stream true/false.")
                     command_handled = True
+            # /set system <prompt>
             elif user_input.startswith("/set system "):
                 try:
                     value = user_input.split(" ", 2)[2]
@@ -198,44 +228,54 @@ def main():
                 except IndexError:
                     print("Invalid command. Use /set system <prompt>")
                     command_handled = True
-            elif user_input == "/new":
-                cmd_registry.execute_command("/new")
+            # /chat new
+            elif user_input.strip() == "/chat new":
+                cmd_registry.execute_command("/chat new")
                 command_handled = True
-            elif user_input.startswith("/save "):
+            # /chat save <name>
+            elif user_input.startswith("/chat save "):
                 try:
-                    chat_name = user_input.split(" ", 1)[1]
-                    cmd_registry.execute_command("/save", chat_name)
+                    chat_name = user_input.split(" ", 2)[2]
+                    cmd_registry.execute_command("/chat save", chat_name)
                     command_handled = True
                 except IndexError:
-                    print("Invalid command. Use /save <chat_name>")
+                    print("Invalid command. Use /chat save <chat_name>")
                     command_handled = True
-            elif user_input.startswith("/load "):
+            # /chat load <name>
+            elif user_input.startswith("/chat load "):
                 try:
-                    chat_name = user_input.split(" ", 1)[1]
-                    cmd_registry.execute_command("/load", chat_name)
+                    chat_name = user_input.split(" ", 2)[2]
+                    cmd_registry.execute_command("/chat load", chat_name)
                     command_handled = True
                 except IndexError:
-                    print("Invalid command. Use /load <chat_name>")
+                    print("Invalid command. Use /chat load <chat_name>")
                     command_handled = True
-            elif user_input.startswith("/delete "):
+            # /chat delete <name>
+            elif user_input.startswith("/chat delete "):
                 try:
-                    chat_name = user_input.split(" ", 1)[1]
-                    cmd_registry.execute_command("/delete", chat_name)
+                    chat_name = user_input.split(" ", 2)[2]
+                    cmd_registry.execute_command("/chat delete", chat_name)
                     command_handled = True
                 except IndexError:
-                    print("Invalid command. Use /delete <chat_name>")
+                    print("Invalid command. Use /chat delete <chat_name>")
                     command_handled = True
-            elif user_input == "/list chats":
-                cmd_registry.execute_command("/list chats")
+            # /chat reset
+            elif user_input.strip() == "/chat reset":
+                cmd_registry.execute_command("/chat reset")
                 command_handled = True
-            elif user_input == "/help":
+            # /chat list
+            elif user_input.strip() == "/chat list":
+                cmd_registry.execute_command("/chat list")
+                command_handled = True
+            # /help
+            elif user_input.strip() == "/help":
                 cmd_registry.execute_command("/help")
                 command_handled = True
-            elif user_input == "/exit":
+            # /exit
+            elif user_input.strip() == "/exit":
                 if not cmd_registry.execute_command("/exit"):
                     break
                 command_handled = True
-            
             # If command wasn't handled, show error
             if not command_handled:
                 print(f"Command '{user_input}' does not exist. Type /help to see available commands.")
