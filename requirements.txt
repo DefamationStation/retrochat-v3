@@ -1,5 +1,0 @@
-lmstudio
-colorama
-typing-extensions
-openai
-httpx
