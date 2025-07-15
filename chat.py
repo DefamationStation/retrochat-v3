@@ -1,3 +1,5 @@
+import time
+
 from openai import OpenAI
 
 class Chat:
@@ -23,7 +25,9 @@ class Chat:
             for chunk in completion:
                 content = chunk.choices[0].delta.content
                 if content:
-                    print(content, end='')
+                    for char in content:
+                        print(char, end='', flush=True)
+                        time.sleep(0.01)
                     response += content
             print()
         else:

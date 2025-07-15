@@ -34,9 +34,7 @@ def main():
             except IndexError:
                 print("Invalid command. Use /set stream true/false.")
         else:
-            response = chat.send_message(user_input, history)
-            if response:
-                print(response)
+            chat.send_message(user_input, history)
 
 if __name__ == "__main__":
     main()
