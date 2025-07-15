@@ -13,6 +13,9 @@ class Chat:
             print("No default model selected. Please use /models to select one.")
             return
 
+        if not history:
+            history.append({"role": "system", "content": self.config_manager.get('system_prompt')})
+
         history.append({"role": "user", "content": message})
         completion = self.client.chat.completions.create(
             model=model,
@@ -32,5 +35,6 @@ class Chat:
             print()
         else:
             response = completion.choices[0].message.content
+            print(response)
         history.append({"role": "assistant", "content": response})
         return response

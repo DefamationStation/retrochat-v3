@@ -33,6 +33,13 @@ def main():
                     print("Invalid value. Use true or false.")
             except IndexError:
                 print("Invalid command. Use /set stream true/false.")
+        elif user_input.startswith("/set system "):
+            try:
+                value = user_input.split(" ", 2)[2]
+                config_manager.set("system_prompt", value)
+                print(f"System prompt set to: {value}")
+            except IndexError:
+                print("Invalid command. Use /set system <prompt>")
         else:
             chat.send_message(user_input, history)
 
