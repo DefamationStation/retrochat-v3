@@ -1,4 +1,5 @@
 from openai import OpenAI
+from utils import yellow_text
 
 
 class Chat:
@@ -27,11 +28,11 @@ class Chat:
             for chunk in completion:
                 content = chunk.choices[0].delta.content
                 if content:
-                    print(content, end='', flush=True)
+                    print(yellow_text(content), end='', flush=True)
                     response += content
             print()
         else:
             response = completion.choices[0].message.content
-            print(response)
+            print(yellow_text(response))
         history.append({"role": "assistant", "content": response})
         return response

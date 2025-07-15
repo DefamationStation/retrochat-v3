@@ -4,6 +4,7 @@ from config_manager import ConfigManager
 from model_manager import ModelManager
 from chat import Chat
 from chat_manager import ChatManager
+from utils import yellow_text
 
 def generate_chat_id():
     import os
@@ -135,7 +136,10 @@ def main():
                 for msg in history:
                     role = msg.get("role", "?")
                     content = msg.get("content", "")
-                    print(f"[{role}] {content}")
+                    if role == "assistant":
+                        print(f"[{role}] {yellow_text(content)}")
+                    else:
+                        print(f"[{role}] {content}")
                 print("---------------------------")
             else:
                 print("Chat not found.")
