@@ -20,8 +20,19 @@ def main():
                 print(f"Default model set to {models.data[selection].id}")
             except (ValueError, IndexError):
                 print("Invalid selection.")
-        elif user_input == "/exit":
-            break
+        elif user_input.startswith("/set stream "):
+            try:
+                value = user_input.split(" ")[2].lower()
+                if value == "true":
+                    config_manager.set("stream", True)
+                    print("Stream enabled.")
+                elif value == "false":
+                    config_manager.set("stream", False)
+                    print("Stream disabled.")
+                else:
+                    print("Invalid value. Use true or false.")
+            except IndexError:
+                print("Invalid command. Use /set stream true/false.")
         else:
             response = chat.send_message(user_input, history)
             if response:

@@ -16,7 +16,17 @@ class Chat:
             model=model,
             messages=history,
             temperature=0.7,
+            stream=self.config_manager.get('stream')
         )
-        response = completion.choices[0].message.content
+        if self.config_manager.get('stream'):
+            response = ''
+            for chunk in completion:
+                content = chunk.choices[0].delta.content
+                if content:
+                    print(content, end='')
+                    response += content
+            print()
+        else:
+            response = completion.choices[0].message.content
         history.append({"role": "assistant", "content": response})
         return response
