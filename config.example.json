@@ -1,0 +1,20 @@
+{
+  "current_provider": "lmstudio",
+  "providers": {
+    "lmstudio": {
+      "api_base": "http://localhost:1234/v1",
+      "api_key": "lm-studio",
+      "default_model": "",
+      "stream": true,
+      "system_prompt": "You're an intelligent AI assistant."
+    },
+    "openrouter": {
+      "api_key": "sk-or-v1-your-openrouter-api-key-here",
+      "default_model": "openai/gpt-4o",
+      "stream": true,
+      "system_prompt": "You're an intelligent AI assistant.",
+      "site_url": "https://your-site.com",
+      "site_name": "Your App Name"
+    }
+  }
+}
