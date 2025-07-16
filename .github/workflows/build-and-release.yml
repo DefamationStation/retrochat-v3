@@ -75,7 +75,7 @@ jobs:
         Copy-Item "LICENSE" -Destination "artifacts\"
     
     - name: Upload executable artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: retrochat-executable-${{ steps.version.outputs.version }}
         path: artifacts/
@@ -183,7 +183,7 @@ jobs:
         twine check dist/*
     
     - name: Upload package artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: retrochat-package-${{ steps.version.outputs.version }}
         path: dist/
@@ -217,13 +217,13 @@ jobs:
         fi
     
     - name: Download executable artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: retrochat-executable-${{ steps.version.outputs.version }}
         path: artifacts/
     
     - name: Download package artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: retrochat-package-${{ steps.version.outputs.version }}
         path: dist/
@@ -327,7 +327,7 @@ jobs:
         fi
     
     - name: Download package artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: retrochat-package-${{ steps.version.outputs.version }}
         path: dist/
