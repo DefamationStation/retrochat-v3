@@ -2,6 +2,31 @@
 
 A modular chat application that supports multiple AI providers through a unified interface.
 
+## Installation
+
+### Option 1: Standalone Executable (Windows)
+Download the latest `rchat.exe` from the [releases page](https://github.com/DefamationStation/retrochat-v3/releases) and run it directly. No Python installation required.
+
+### Option 2: Install via pip
+```bash
+pip install retrochat-cli
+rchat
+```
+
+### Option 3: Install from GitHub
+```bash
+pip install git+https://github.com/DefamationStation/retrochat-v3.git
+rchat
+```
+
+### Option 4: Development Installation
+```bash
+git clone https://github.com/DefamationStation/retrochat-v3.git
+cd retrochat-v3
+pip install -r requirements.txt
+python main.py
+```
+
 ## Features
 
 - **Multi-Provider Support**: Easily switch between different AI providers
