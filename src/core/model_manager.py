@@ -2,8 +2,17 @@ from typing import List, Dict, Any, Optional
 from .config_manager import ConfigManager
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from providers import provider_factory
+
+# Import provider factory with proper path handling
+try:
+    from src.providers import provider_factory
+except ImportError:
+    try:
+        from providers import provider_factory
+    except ImportError:
+        # Last resort - add to path and try again
+        sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+        from providers import provider_factory
 
 class ModelManager:
     def __init__(self, config_manager: ConfigManager):

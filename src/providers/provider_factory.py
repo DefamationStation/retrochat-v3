@@ -6,6 +6,7 @@ and provides a factory for creating provider instances.
 """
 
 import os
+import sys
 import importlib
 import inspect
 from typing import Dict, List, Type, Optional, Any
@@ -21,6 +22,58 @@ class ProviderRegistry:
     
     def _discover_providers(self):
         """Automatically discover provider implementations."""
+        # Check if we're running in a PyInstaller bundle
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            # Running in PyInstaller bundle - manually import known providers
+            self._register_bundled_providers()
+        else:
+            # Running normally - discover from filesystem
+            self._discover_filesystem_providers()
+    
+    def _register_bundled_providers(self):
+        """Register providers when running in PyInstaller bundle."""
+        # Manually import known provider modules
+        known_providers = ['lmstudio_provider', 'openrouter_provider']
+        
+        for module_name in known_providers:
+            try:
+                # Try different import paths for PyInstaller
+                module = None
+                import_paths = [
+                    f'src.providers.{module_name}',
+                    f'providers.{module_name}',
+                    module_name
+                ]
+                
+                for import_path in import_paths:
+                    try:
+                        module = importlib.import_module(import_path)
+                        break
+                    except ImportError:
+                        continue
+                
+                if not module:
+                    continue
+                
+                # Look for classes that inherit from BaseProvider
+                for name, obj in inspect.getmembers(module, inspect.isclass):
+                    if (issubclass(obj, BaseProvider) and 
+                        obj != BaseProvider and 
+                        hasattr(obj, 'get_provider_name')):
+                        
+                        # Create a temporary instance to get the provider name
+                        try:
+                            temp_instance = obj({})
+                            provider_name = temp_instance.get_provider_name()
+                            self._providers[provider_name] = obj
+                        except Exception as e:
+                            print(f"Error registering provider in {module_name}: {e}")
+                            
+            except Exception as e:
+                print(f"Error processing provider module {module_name}: {e}")
+    
+    def _discover_filesystem_providers(self):
+        """Discover providers from filesystem (normal execution)."""
         providers_dir = os.path.dirname(__file__)
         
         # Look for Python files in the providers directory

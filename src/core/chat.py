@@ -2,9 +2,19 @@ from typing import List, Dict, Any
 from .config_manager import ConfigManager
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from providers import provider_factory
-from utils.terminal_colors import yellow_text
+
+# Import provider factory with proper path handling
+try:
+    from src.providers import provider_factory
+except ImportError:
+    try:
+        from providers import provider_factory
+    except ImportError:
+        # Last resort - add to path and try again
+        sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+        from providers import provider_factory
+
+from src.utils.terminal_colors import yellow_text
 
 
 class Chat:
@@ -30,6 +40,7 @@ class Chat:
             provider_factory.set_current_provider(self._current_provider)
         else:
             print(f"Failed to initialize provider: {current_provider_name}")
+            print("Please check your configuration and ensure the provider is properly configured.")
 
     def refresh_provider(self):
         """Refresh the current provider (useful after config changes)."""

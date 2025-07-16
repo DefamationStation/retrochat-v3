@@ -10,6 +10,7 @@ a = Analysis(
         ('config.example.json', '.'),
         ('README.md', '.'),
         ('LICENSE', '.'),
+        ('src', 'src'),  # Include the entire src directory
     ],
     hiddenimports=[
         'src.core.config_manager',
@@ -23,6 +24,10 @@ a = Analysis(
         'src.providers.openrouter_provider',
         'src.providers.provider_factory',
         'src.providers.base_provider',
+        'src.providers',
+        'src.core',
+        'src.ui',
+        'src.utils',
     ],
     hookspath=[],
     hooksconfig={},

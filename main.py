@@ -21,27 +21,40 @@ from src.utils.terminal_colors import yellow_text
 
 def main():
     """Main application entry point."""
-    # Initialize core components
-    config_manager = ConfigManager()
-    model_manager = ModelManager(config_manager)
-    chat = Chat(config_manager)
-    chat_manager = ChatManager()
-    
-    # Initialize UI components
-    cmd_registry = CommandRegistry()
-    cmd_handlers = CommandHandlers(config_manager, model_manager, chat, chat_manager)
-    
-    # Display welcome message
-    current_provider = model_manager.get_current_provider_name()
-    current_model = model_manager.get_default_model() or "No model selected"
-    
-    print("=" * 50)
-    print("🎉 Welcome to RetroChat! 🎉")
-    print("=" * 50)
-    print(f"Current Provider: {current_provider}")
-    print(f"Current Model: {current_model}")
-    print("Type /help for available commands")
-    print("=" * 50)
+    try:
+        # Initialize core components
+        print("Initializing configuration manager...")
+        config_manager = ConfigManager()
+        
+        print("Initializing model manager...")
+        model_manager = ModelManager(config_manager)
+        
+        print("Initializing chat...")
+        chat = Chat(config_manager)
+        
+        print("Initializing chat manager...")
+        chat_manager = ChatManager()
+        
+        # Initialize UI components
+        cmd_registry = CommandRegistry()
+        cmd_handlers = CommandHandlers(config_manager, model_manager, chat, chat_manager)
+        
+        # Display welcome message
+        current_provider = model_manager.get_current_provider_name()
+        current_model = model_manager.get_default_model() or "No model selected"
+        
+        print("=" * 50)
+        print("🎉 Welcome to RetroChat! 🎉")
+        print("=" * 50)
+        print(f"Current Provider: {current_provider}")
+        print(f"Current Model: {current_model}")
+        print("Type /help for available commands")
+        print("=" * 50)
+    except Exception as e:
+        print(f"Error during initialization: {e}")
+        import traceback
+        traceback.print_exc()
+        return
     
     # Load the last used chat or create a new one
     existing_chats = chat_manager.list_chats()
