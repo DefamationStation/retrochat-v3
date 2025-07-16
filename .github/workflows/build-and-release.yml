@@ -74,11 +74,12 @@ jobs:
         Copy-Item "README.md" -Destination "artifacts\"
         Copy-Item "LICENSE" -Destination "artifacts\"
     
-    - name: Upload Windows Executable
+    - name: Upload executable artifact
       uses: actions/upload-artifact@v4
       with:
-        name: retrochat-executable
-        path: dist/rchat.exe
+        name: retrochat-executable-${{ steps.version.outputs.version }}
+        path: artifacts/
+        retention-days: 30
 
   build-package:
     runs-on: ubuntu-latest
@@ -211,33 +212,86 @@ jobs:
           echo "release_name=RetroChat Development Build ($short_sha)" >> $GITHUB_OUTPUT
         fi
     
-    - name: Download All Artifacts
+    - name: Download executable artifacts
       uses: actions/download-artifact@v4
       with:
+        name: retrochat-executable-${{ steps.version.outputs.version }}
+        path: artifacts/
+    
+    - name: Download package artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: retrochat-package-${{ steps.version.outputs.version }}
         path: dist/
     
-    - name: Get Package Version
-      id: get_version
+    - name: Generate release notes
+      id: release_notes
       run: |
-        if [[ $GITHUB_REF =~ refs/tags/v(.+) ]]; then
-          version="${BASH_REMATCH[1]}"
-          echo "version=$version" >> $GITHUB_OUTPUT
+        if [[ "${{ steps.version.outputs.is_release }}" == "true" ]]; then
+          cat > release_notes.md << 'EOF'
+        ## RetroChat v${{ steps.version.outputs.version }}
+        
+        ### 🎉 What's New
+        - Multi-provider AI chat application
+        - Support for OpenRouter and LMStudio providers
+        - Interactive command-line interface
+        - Chat session management
+        - Configurable streaming responses
+        
+        ### 📦 Installation Options
+        
+        #### Option 1: Standalone Executable (Windows)
+        Download `rchat-${{ steps.version.outputs.version }}.exe` and run it directly.
+        
+        #### Option 2: Python Package
+        ```bash
+        pip install retrochat-cli==${{ steps.version.outputs.version }}
+        rchat
+        ```
+        
+        #### Option 3: Install from GitHub
+        ```bash
+        pip install git+https://github.com/DefamationStation/retrochat-v3.git@v${{ steps.version.outputs.version }}
+        ```
+        
+        ### 🚀 Quick Start
+        1. Download and run the executable or install via pip
+        2. Copy `config.example.json` to `config.json`
+        3. Configure your AI provider settings
+        4. Type `rchat` to start chatting!
+        
+        For detailed setup instructions, see the [README](https://github.com/DefamationStation/retrochat-v3#readme).
+        EOF
+        else
+          cat > release_notes.md << 'EOF'
+        ## RetroChat Development Build
+        
+        This is an automated development build from the latest commits on the main branch.
+        
+        **⚠️ Warning**: This is a development build and may contain bugs or incomplete features.
+        
+        ### Installation
+        
+        #### Standalone Executable (Windows)
+        Download `rchat-${{ steps.version.outputs.version }}.exe` and run it directly.
+        
+        #### Python Package
+        ```bash
+        pip install retrochat-cli==${{ steps.version.outputs.version }}
+        rchat
+        ```
+        
+        ### Latest Changes
+        See the [commit history](https://github.com/DefamationStation/retrochat-v3/commits/main) for the latest changes.
+        EOF
         fi
+        
+        echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+        cat release_notes.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
     
-    - name: List downloaded files
-      run: ls -R dist
-
-    - name: Rename Executable
-      id: rename_exe
-      run: |
-        $file = Get-ChildItem -Path "dist/retrochat-executable/rchat.exe"
-        $newName = "rchat-${{ steps.get_version.outputs.version }}.exe"
-        Rename-Item -Path $file.FullName -NewName $newName
-        echo "new_name=$newName" >> $env:GITHUB_OUTPUT
-      shell: pwsh
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
+    - name: Create or Update Release
+      uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ steps.version.outputs.is_release == 'true' && format('v{0}', steps.version.outputs.version) || format('dev-{0}', github.sha) }}
         name: ${{ steps.version.outputs.release_name }}
@@ -245,8 +299,12 @@ jobs:
         draft: false
         prerelease: ${{ steps.version.outputs.is_release != 'true' }}
         files: |
-          dist/pip-packages/*
-          dist/retrochat-executable/${{ steps.rename_exe.outputs.new_name }}
+          artifacts/rchat-${{ steps.version.outputs.version }}.exe
+          artifacts/config.example.json
+          artifacts/README.md
+          artifacts/LICENSE
+          dist/*.whl
+          dist/*.tar.gz
         token: ${{ secrets.GITHUB_TOKEN }}
 
   # Optional: Publish to PyPI on tagged releases
