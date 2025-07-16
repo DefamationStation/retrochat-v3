@@ -15,6 +15,32 @@ from core.chat import Chat
 from core.chat_manager import ChatManager
 from utils.terminal_colors import yellow_text
 
+def display_chat_history(history, show_all=True, max_recent=10):
+    """Display chat history with proper formatting."""
+    if not history:
+        print("No chat history.")
+        return
+    
+    messages_to_show = history
+    if not show_all and len(history) > max_recent:
+        messages_to_show = history[-max_recent:]
+        print(f"Showing last {len(messages_to_show)} messages (out of {len(history)} total)")
+    
+    print("--- Conversation History ---")
+    for i, msg in enumerate(messages_to_show, 1):
+        role = msg.get("role", "?")
+        content = msg.get("content", "")
+        
+        # Skip system messages in display unless specifically requested
+        if role == "system":
+            continue
+            
+        if role == "assistant":
+            print(f"[{i}] [{role}] {yellow_text(content)}")
+        else:
+            print(f"[{i}] [{role}] {content}")
+    print("---------------------------")
+
 def generate_chat_id():
     """Generate a unique chat ID."""
     chats_dir = 'chats'
@@ -136,15 +162,7 @@ class CommandHandlers:
                 self.history = loaded_history
                 self.current_chat = chat_name
                 print(f"Chat {chat_name} loaded.")
-                print("--- Conversation History ---")
-                for msg in self.history:
-                    role = msg.get("role", "?")
-                    content = msg.get("content", "")
-                    if role == "assistant":
-                        print(f"[{role}] {yellow_text(content)}")
-                    else:
-                        print(f"[{role}] {content}")
-                print("---------------------------")
+                display_chat_history(self.history, show_all=True)
             else:
                 print("Chat not found.")
         except Exception:
@@ -180,6 +198,18 @@ class CommandHandlers:
         """Clear the current chat's conversation history"""
         self.history = []
         print("Current chat history cleared.")
+        return True
+    
+    def cmd_chat_history(self):
+        """Show the full conversation history of the current chat"""
+        print(f"Chat: {self.current_chat}")
+        display_chat_history(self.history, show_all=True)
+        return True
+    
+    def cmd_chat_recent(self):
+        """Show recent messages from the current chat"""
+        print(f"Chat: {self.current_chat}")
+        display_chat_history(self.history, show_all=False, max_recent=10)
         return True
     
     def cmd_help(self, cmd_registry):

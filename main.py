@@ -51,17 +51,9 @@ def main():
         history = chat_manager.load_chat(current_chat) or []
         print(f"Loaded last used chat: {current_chat}")
         if history:
-            print("--- Recent Conversation ---")
-            # Show last few messages for context
-            recent_messages = history[-4:] if len(history) > 4 else history
-            for msg in recent_messages:
-                role = msg.get("role", "?")
-                content = msg.get("content", "")
-                if role == "assistant":
-                    print(f"[{role}] {yellow_text(content[:100])}{'...' if len(content) > 100 else ''}")
-                else:
-                    print(f"[{role}] {content[:100]}{'...' if len(content) > 100 else ''}")
-            print("---------------------------")
+            # Show recent messages for context  
+            from src.ui.commands import display_chat_history
+            display_chat_history(history, show_all=False, max_recent=6)
     else:
         # No existing chats, create a new one
         current_chat = generate_chat_id()
@@ -86,6 +78,8 @@ def main():
     cmd_registry.register("/chat load", "Load a previously saved chat", cmd_handlers.cmd_chat_load)
     cmd_registry.register("/chat delete", "Delete a saved chat", cmd_handlers.cmd_chat_delete)
     cmd_registry.register("/chat reset", "Clear the current chat's conversation history", cmd_handlers.cmd_chat_reset)
+    cmd_registry.register("/chat history", "Show the full conversation history of the current chat", cmd_handlers.cmd_chat_history)
+    cmd_registry.register("/chat recent", "Show recent messages from the current chat", cmd_handlers.cmd_chat_recent)
     cmd_registry.register("/chat list", "List all saved chats", cmd_handlers.cmd_chat_list)
     cmd_registry.register("/help", "Show this help message with all available commands", lambda: cmd_handlers.cmd_help(cmd_registry))
     cmd_registry.register("/exit", "Exit the chat application", cmd_handlers.cmd_exit)
@@ -147,6 +141,12 @@ def main():
                     command_handled = True
             elif user_input.strip() == "/chat reset":
                 cmd_registry.execute_command("/chat reset")
+                command_handled = True
+            elif user_input.strip() == "/chat history":
+                cmd_registry.execute_command("/chat history")
+                command_handled = True
+            elif user_input.strip() == "/chat recent":
+                cmd_registry.execute_command("/chat recent")
                 command_handled = True
             elif user_input.strip() == "/chat list":
                 cmd_registry.execute_command("/chat list")
