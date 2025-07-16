@@ -200,18 +200,6 @@ class CommandHandlers:
         print("Current chat history cleared.")
         return True
     
-    def cmd_chat_history(self):
-        """Show the full conversation history of the current chat"""
-        print(f"Chat: {self.current_chat}")
-        display_chat_history(self.history, show_all=True)
-        return True
-    
-    def cmd_chat_recent(self):
-        """Show recent messages from the current chat"""
-        print(f"Chat: {self.current_chat}")
-        display_chat_history(self.history, show_all=False, max_recent=10)
-        return True
-    
     def cmd_help(self, cmd_registry):
         """Show this help message with all available commands"""
         print("Available commands:")
