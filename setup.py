@@ -4,11 +4,20 @@ import os
 # Get version from environment or default
 version = os.environ.get('PACKAGE_VERSION', '3.0.0')
 
+# Read requirements with fallback
+requirements = []
+try:
+    with open("requirements.txt", "r", encoding="utf-8") as fh:
+        requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
+except FileNotFoundError:
+    # Fallback requirements if file not found
+    requirements = [
+        "requests>=2.25.0",
+        "openai>=1.0.0",
+    ]
+
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
-
-with open("requirements.txt", "r", encoding="utf-8") as fh:
-    requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
     name="retrochat-cli",
@@ -23,7 +32,6 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",

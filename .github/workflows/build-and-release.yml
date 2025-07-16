@@ -118,64 +118,58 @@ jobs:
         
         echo "Building version: $version"
     
-    - name: Create setup.py
+    - name: Create pyproject.toml
       run: |
-        cat > setup.py << 'EOF'
-        from setuptools import setup, find_packages
-        import os
-        
-        # Get version from environment or default
-        version = os.environ.get('PACKAGE_VERSION', '3.0.0')
-        
-        with open("README.md", "r", encoding="utf-8") as fh:
-            long_description = fh.read()
-        
-        with open("requirements.txt", "r", encoding="utf-8") as fh:
-            requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
-        
-        setup(
-            name="retrochat-cli",
-            version=version,
-            author="DefamationStation",
-            author_email="your-email@example.com",
-            description="Multi-Provider AI Chat Application",
-            long_description=long_description,
-            long_description_content_type="text/markdown",
-            url="https://github.com/DefamationStation/retrochat-v3",
-            packages=find_packages(),
-            classifiers=[
-                "Development Status :: 4 - Beta",
-                "Intended Audience :: Developers",
-                "License :: OSI Approved :: MIT License",
-                "Operating System :: OS Independent",
-                "Programming Language :: Python :: 3",
-                "Programming Language :: Python :: 3.8",
-                "Programming Language :: Python :: 3.9",
-                "Programming Language :: Python :: 3.10",
-                "Programming Language :: Python :: 3.11",
-                "Programming Language :: Python :: 3.12",
-                "Topic :: Communications :: Chat",
-                "Topic :: Scientific/Engineering :: Artificial Intelligence",
-            ],
-            python_requires=">=3.8",
-            install_requires=requirements,
-            entry_points={
-                "console_scripts": [
-                    "rchat=main:main",
-                ],
-            },
-            include_package_data=True,
-            package_data={
-                "": ["*.json", "*.md", "LICENSE"],
-            },
-        )
+        cat > pyproject.toml << 'EOF'
+        [build-system]
+        requires = ["setuptools>=45", "wheel", "setuptools_scm"]
+        build-backend = "setuptools.build_meta"
+
+        [project]
+        name = "retrochat-cli"
+        version = "${{ steps.version.outputs.version }}"
+        description = "Multi-Provider AI Chat Application"
+        readme = "README.md"
+        license-files = ["LICENSE"]
+        authors = [
+            {name = "DefamationStation", email = "your-email@example.com"}
+        ]
+        classifiers = [
+            "Development Status :: 4 - Beta",
+            "Intended Audience :: Developers",
+            "Operating System :: OS Independent",
+            "Programming Language :: Python :: 3",
+            "Programming Language :: Python :: 3.8",
+            "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3.10",
+            "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
+            "Topic :: Communications :: Chat",
+            "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        ]
+        requires-python = ">=3.8"
+        dependencies = [
+            "requests>=2.25.0",
+            "openai>=1.0.0",
+        ]
+
+        [project.urls]
+        Homepage = "https://github.com/DefamationStation/retrochat-v3"
+        Repository = "https://github.com/DefamationStation/retrochat-v3"
+        Issues = "https://github.com/DefamationStation/retrochat-v3/issues"
+
+        [project.scripts]
+        rchat = "main:main"
+
+        [tool.setuptools.packages.find]
+        include = ["src*"]
+
+        [tool.setuptools.package-data]
+        "*" = ["*.json", "*.md", "LICENSE"]
         EOF
-      env:
-        PACKAGE_VERSION: ${{ steps.version.outputs.version }}
     
     - name: Build package
       run: |
-        export PACKAGE_VERSION="${{ steps.version.outputs.version }}"
         python -m build
     
     - name: Verify package
