@@ -174,8 +174,10 @@ jobs:
     
     - name: Verify package
       run: |
-        twine check dist/*
-    
+        pip install twine
+        twine check dist/*.whl dist/*.tar.gz
+      shell: pwsh
+
     - name: Upload package artifacts
       uses: actions/upload-artifact@v4
       with:
