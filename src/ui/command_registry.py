@@ -7,11 +7,12 @@ class CommandRegistry:
     def __init__(self):
         self.commands = {}
     
-    def register(self, command, description, handler):
+    def register(self, command, description, handler, takes_args=False):
         """Register a command with its description and handler function"""
         self.commands[command] = {
             'description': description,
-            'handler': handler
+            'handler': handler,
+            'takes_args': takes_args
         }
     
     def get_command(self, command):

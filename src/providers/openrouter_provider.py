@@ -5,25 +5,20 @@ This provider connects to OpenRouter's API which provides access to
 hundreds of AI models through a unified interface.
 """
 
-from typing import List, Dict, Any, Iterator
+from typing import List, Dict, Any
 from openai import OpenAI
-from .base_provider import BaseProvider, BaseModelManager, BaseChat
 import requests
+from .base_openai_provider import BaseOpenAIProvider, BaseOpenAIModelManager, BaseOpenAIChat
 
 
-class OpenRouterModelManager(BaseModelManager):
+class OpenRouterModelManager(BaseOpenAIModelManager):
     """Model manager for OpenRouter."""
-    
-    def __init__(self, client: OpenAI, api_key: str):
-        self.client = client
-        self.api_key = api_key
-    
+
     def get_models(self) -> List[Dict[str, Any]]:
         """Get available models from OpenRouter."""
         try:
-            # Use OpenRouter's models API endpoint
             headers = {
-                'Authorization': f'Bearer {self.api_key}',
+                'Authorization': f'Bearer {self.client.api_key}',
                 'Content-Type': 'application/json'
             }
             
@@ -58,70 +53,27 @@ class OpenRouterModelManager(BaseModelManager):
         except Exception as e:
             print(f"Error fetching models from OpenRouter: {e}")
             return []
-    
-    def get_model_info(self, model_id: str) -> Dict[str, Any]:
-        """Get information about a specific model."""
-        models = self.get_models()
-        for model in models:
-            if model['id'] == model_id:
-                return model
-        return {}
 
 
-class OpenRouterChat(BaseChat):
+class OpenRouterChat(BaseOpenAIChat):
     """Chat implementation for OpenRouter."""
-    
-    def __init__(self, client: OpenAI, config: Dict[str, Any]):
-        self.client = client
-        self.config = config
-    
+
     def _prepare_headers(self) -> Dict[str, str]:
         """Prepare OpenRouter-specific headers."""
         headers = {}
         
-        # Optional headers for OpenRouter leaderboards
         if 'site_url' in self.config:
             headers['HTTP-Referer'] = self.config['site_url']
         if 'site_name' in self.config:
             headers['X-Title'] = self.config['site_name']
             
         return headers
-    
+
     def send_message(self, message: str, history: List[Dict[str, Any]], **kwargs) -> str:
         """Send a message to OpenRouter and get response."""
         try:
-            # Prepare the messages
-            messages = history.copy()
-            
-            # Add system message if not present and system_prompt is configured
-            if not any(msg.get('role') == 'system' for msg in messages):
-                system_prompt = self.config.get('system_prompt')
-                if system_prompt:
-                    messages.insert(0, {"role": "system", "content": system_prompt})
-            
-            # Add user message
-            messages.append({"role": "user", "content": message})
-            
-            # Get model from config
-            model = self.config.get('default_model')
-            if not model:
-                raise ValueError("No default model configured")
-            
-            # Prepare parameters
-            params = {
-                'model': model,
-                'messages': messages,
-                'temperature': kwargs.get('temperature', 0.7),
-                'stream': False
-            }
-            
-            # Add optional parameters if provided
-            if 'max_tokens' in kwargs:
-                params['max_tokens'] = kwargs['max_tokens']
-            if 'top_p' in kwargs:
-                params['top_p'] = kwargs['top_p']
-            
-            # Add OpenRouter-specific headers
+            messages = self._prepare_messages(message, history)
+            params = self._prepare_params(messages, stream=False, **kwargs)
             extra_headers = self._prepare_headers()
             
             completion = self.client.chat.completions.create(
@@ -129,45 +81,14 @@ class OpenRouterChat(BaseChat):
                 **params
             )
             return completion.choices[0].message.content
-            
         except Exception as e:
             return f"Error: {str(e)}"
-    
-    def send_message_stream(self, message: str, history: List[Dict[str, Any]], **kwargs) -> Iterator[str]:
+
+    def send_message_stream(self, message: str, history: List[Dict[str, Any]], **kwargs) -> str:
         """Send a message to OpenRouter and get streaming response."""
         try:
-            # Prepare the messages
-            messages = history.copy()
-            
-            # Add system message if not present and system_prompt is configured
-            if not any(msg.get('role') == 'system' for msg in messages):
-                system_prompt = self.config.get('system_prompt')
-                if system_prompt:
-                    messages.insert(0, {"role": "system", "content": system_prompt})
-            
-            # Add user message
-            messages.append({"role": "user", "content": message})
-            
-            # Get model from config
-            model = self.config.get('default_model')
-            if not model:
-                raise ValueError("No default model configured")
-            
-            # Prepare parameters
-            params = {
-                'model': model,
-                'messages': messages,
-                'temperature': kwargs.get('temperature', 0.7),
-                'stream': True
-            }
-            
-            # Add optional parameters if provided
-            if 'max_tokens' in kwargs:
-                params['max_tokens'] = kwargs['max_tokens']
-            if 'top_p' in kwargs:
-                params['top_p'] = kwargs['top_p']
-            
-            # Add OpenRouter-specific headers
+            messages = self._prepare_messages(message, history)
+            params = self._prepare_params(messages, stream=True, **kwargs)
             extra_headers = self._prepare_headers()
             
             completion = self.client.chat.completions.create(
@@ -179,26 +100,28 @@ class OpenRouterChat(BaseChat):
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
-                    
         except Exception as e:
             yield f"Error: {str(e)}"
 
 
-class OpenRouterProvider(BaseProvider):
+class OpenRouterProvider(BaseOpenAIProvider):
     """OpenRouter provider implementation."""
     
     def get_provider_name(self) -> str:
         return "openrouter"
-    
+
+    def get_api_base(self) -> str:
+        return "https://openrouter.ai/api/v1"
+
     def get_required_config_keys(self) -> List[str]:
         return ["api_key"]
-    
+
     def get_optional_config_keys(self) -> List[str]:
         return [
             "default_model", "system_prompt", "stream", "temperature", 
             "max_tokens", "top_p", "site_url", "site_name"
         ]
-    
+
     def validate_config(self) -> bool:
         """Validate OpenRouter configuration."""
         required_keys = self.get_required_config_keys()
@@ -208,14 +131,13 @@ class OpenRouterProvider(BaseProvider):
                 print(f"Missing required configuration key: {key}")
                 return False
         
-        # Validate API key format (should start with sk-)
         api_key = self.config.get('api_key', '')
         if not api_key.startswith('sk-'):
             print("OpenRouter API key should start with 'sk-'")
             return False
         
         return True
-    
+
     def test_connection(self) -> bool:
         """Test connection to OpenRouter."""
         try:
@@ -224,7 +146,6 @@ class OpenRouterProvider(BaseProvider):
                 'Content-Type': 'application/json'
             }
             
-            # Test with a simple models request
             response = requests.get(
                 'https://openrouter.ai/api/v1/models',
                 headers=headers,
@@ -236,19 +157,11 @@ class OpenRouterProvider(BaseProvider):
         except Exception as e:
             print(f"OpenRouter connection test failed: {e}")
             return False
-    
-    def create_model_manager(self) -> BaseModelManager:
+
+    def create_model_manager(self) -> BaseOpenAIModelManager:
         """Create OpenRouter model manager."""
-        client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=self.config['api_key']
-        )
-        return OpenRouterModelManager(client, self.config['api_key'])
-    
-    def create_chat(self) -> BaseChat:
+        return OpenRouterModelManager(self.get_client())
+
+    def create_chat(self) -> BaseOpenAIChat:
         """Create OpenRouter chat."""
-        client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=self.config['api_key']
-        )
-        return OpenRouterChat(client, self.config)
+        return OpenRouterChat(self.get_client(), self.config)

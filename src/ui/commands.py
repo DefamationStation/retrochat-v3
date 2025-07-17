@@ -108,6 +108,23 @@ class CommandHandlers:
             print("Invalid selection.")
         return True
     
+    def cmd_set(self, *args):
+        """Enable or disable settings."""
+        if not args or len(args) < 2:
+            print("Invalid command. Use /set stream true/false or /set system <prompt>")
+            return True
+
+        setting = args[0]
+        value = " ".join(args[1:])
+
+        if setting == "stream":
+            return self.cmd_set_stream(value)
+        elif setting == "system":
+            return self.cmd_set_system(value)
+        else:
+            print(f"Unknown setting: {setting}")
+        return True
+
     def cmd_set_stream(self, value):
         """Enable or disable streaming responses (true/false)"""
         try:
@@ -134,6 +151,40 @@ class CommandHandlers:
             print("Invalid command. Use /set system <prompt>")
         return True
     
+    def cmd_chat(self, *args):
+        """Manage chat sessions."""
+        if not args:
+            print("Invalid command. Use /chat new, save, load, delete, reset, list")
+            return True
+
+        sub_command = args[0]
+        chat_args = args[1:]
+
+        if sub_command == "new":
+            return self.cmd_chat_new()
+        elif sub_command == "save":
+            if not chat_args:
+                print("Usage: /chat save <chat_name>")
+                return True
+            return self.cmd_chat_save(chat_args[0])
+        elif sub_command == "load":
+            if not chat_args:
+                print("Usage: /chat load <chat_name>")
+                return True
+            return self.cmd_chat_load(chat_args[0])
+        elif sub_command == "delete":
+            if not chat_args:
+                print("Usage: /chat delete <chat_name>")
+                return True
+            return self.cmd_chat_delete(chat_args[0])
+        elif sub_command == "reset":
+            return self.cmd_chat_reset()
+        elif sub_command == "list":
+            return self.cmd_chat_list()
+        else:
+            print(f"Unknown chat command: {sub_command}")
+        return True
+
     def cmd_chat_new(self):
         """Start a new chat session"""
         self.current_chat = generate_chat_id()
@@ -212,6 +263,33 @@ class CommandHandlers:
         """Exit the chat application"""
         return False
     
+    def cmd_provider(self, *args):
+        """Manage providers."""
+        if not args:
+            print("Invalid command. Use /provider list, switch, test, config")
+            return True
+
+        sub_command = args[0]
+        provider_args = args[1:]
+
+        if sub_command == "list":
+            return self.cmd_provider_list()
+        elif sub_command == "switch":
+            if not provider_args:
+                print("Usage: /provider switch <provider_name>")
+                return True
+            return self.cmd_provider_switch(provider_args[0])
+        elif sub_command == "test":
+            return self.cmd_provider_test()
+        elif sub_command == "config":
+            if not provider_args:
+                print("Usage: /provider config <provider_name>")
+                return True
+            return self.cmd_provider_config(provider_args[0])
+        else:
+            print(f"Unknown provider command: {sub_command}")
+        return True
+
     def cmd_provider_list(self):
         """List all available and configured providers"""
         available_providers = self.model_manager.get_available_providers()

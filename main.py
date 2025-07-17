@@ -79,19 +79,10 @@ def main():
     print()
     
     # Register all commands
-    cmd_registry.register("/model list", "List and select available AI models", cmd_handlers.cmd_model_list)
-    cmd_registry.register("/set stream", "Enable or disable streaming responses (true/false)", cmd_handlers.cmd_set_stream)
-    cmd_registry.register("/set system", "Set the system prompt for the AI", cmd_handlers.cmd_set_system)
-    cmd_registry.register("/provider list", "List all available and configured providers", cmd_handlers.cmd_provider_list)
-    cmd_registry.register("/provider switch", "Switch to a different provider", cmd_handlers.cmd_provider_switch)
-    cmd_registry.register("/provider test", "Test connection to current provider", cmd_handlers.cmd_provider_test)
-    cmd_registry.register("/provider config", "Show configuration for a provider", cmd_handlers.cmd_provider_config)
-    cmd_registry.register("/chat new", "Start a new chat session", cmd_handlers.cmd_chat_new)
-    cmd_registry.register("/chat save", "Save the current chat with a given name", cmd_handlers.cmd_chat_save)
-    cmd_registry.register("/chat load", "Load a previously saved chat", cmd_handlers.cmd_chat_load)
-    cmd_registry.register("/chat delete", "Delete a saved chat", cmd_handlers.cmd_chat_delete)
-    cmd_registry.register("/chat reset", "Clear the current chat's conversation history", cmd_handlers.cmd_chat_reset)
-    cmd_registry.register("/chat list", "List all saved chats", cmd_handlers.cmd_chat_list)
+    cmd_registry.register("/model", "Usage: /model list", cmd_handlers.cmd_model_list, takes_args=True)
+    cmd_registry.register("/set", "Usage: /set stream true/false or /set system <prompt>", cmd_handlers.cmd_set, takes_args=True)
+    cmd_registry.register("/provider", "Usage: /provider list, switch, test, config", cmd_handlers.cmd_provider, takes_args=True)
+    cmd_registry.register("/chat", "Usage: /chat new, save, load, delete, reset, list", cmd_handlers.cmd_chat, takes_args=True)
     cmd_registry.register("/help", "Show this help message with all available commands", lambda: cmd_handlers.cmd_help(cmd_registry))
     cmd_registry.register("/exit", "Exit the chat application", cmd_handlers.cmd_exit)
 
@@ -99,100 +90,28 @@ def main():
     while True:
         user_input = input("> ")
         
-        # Check if input is a command (starts with /)
-        if user_input.startswith("/"):
-            command_handled = False
-            
-            # Parse and execute commands
-            if user_input.strip() == "/model list":
-                cmd_registry.execute_command("/model list")
-                command_handled = True
-            elif user_input.startswith("/set stream "):
-                try:
-                    value = user_input.split(" ", 2)[2]
-                    cmd_registry.execute_command("/set stream", value)
-                    command_handled = True
-                except IndexError:
-                    print("Invalid command. Use /set stream true/false.")
-                    command_handled = True
-            elif user_input.startswith("/set system "):
-                try:
-                    value = user_input.split(" ", 2)[2]
-                    cmd_registry.execute_command("/set system", value)
-                    command_handled = True
-                except IndexError:
-                    print("Invalid command. Use /set system <prompt>")
-                    command_handled = True
-            elif user_input.strip() == "/chat new":
-                cmd_registry.execute_command("/chat new")
-                command_handled = True
-            elif user_input.startswith("/chat save "):
-                try:
-                    chat_name = user_input.split(" ", 2)[2]
-                    cmd_registry.execute_command("/chat save", chat_name)
-                    command_handled = True
-                except IndexError:
-                    print("Invalid command. Use /chat save <chat_name>")
-                    command_handled = True
-            elif user_input.startswith("/chat load "):
-                try:
-                    chat_name = user_input.split(" ", 2)[2]
-                    cmd_registry.execute_command("/chat load", chat_name)
-                    command_handled = True
-                except IndexError:
-                    print("Invalid command. Use /chat load <chat_name>")
-                    command_handled = True
-            elif user_input.startswith("/chat delete "):
-                try:
-                    chat_name = user_input.split(" ", 2)[2]
-                    cmd_registry.execute_command("/chat delete", chat_name)
-                    command_handled = True
-                except IndexError:
-                    print("Invalid command. Use /chat delete <chat_name>")
-                    command_handled = True
-            elif user_input.strip() == "/chat reset":
-                cmd_registry.execute_command("/chat reset")
-                command_handled = True
-            elif user_input.strip() == "/chat list":
-                cmd_registry.execute_command("/chat list")
-                command_handled = True
-            elif user_input.strip() == "/help":
-                cmd_registry.execute_command("/help")
-                command_handled = True
-            elif user_input.strip() == "/provider list":
-                cmd_registry.execute_command("/provider list")
-                command_handled = True
-            elif user_input.startswith("/provider switch "):
-                try:
-                    provider_name = user_input.split(" ", 2)[2]
-                    cmd_registry.execute_command("/provider switch", provider_name)
-                    command_handled = True
-                except IndexError:
-                    print("Invalid command. Use /provider switch <provider_name>")
-                    command_handled = True
-            elif user_input.strip() == "/provider test":
-                cmd_registry.execute_command("/provider test")
-                command_handled = True
-            elif user_input.startswith("/provider config "):
-                try:
-                    provider_name = user_input.split(" ", 2)[2]
-                    cmd_registry.execute_command("/provider config", provider_name)
-                    command_handled = True
-                except IndexError:
-                    print("Invalid command. Use /provider config <provider_name>")
-                    command_handled = True
-            elif user_input.strip() == "/exit":
-                if not cmd_registry.execute_command("/exit"):
-                    break
-                command_handled = True
-            
-            # If command wasn't handled, show error
-            if not command_handled:
-                print(f"Command '{user_input}' does not exist. Type /help to see available commands.")
-        else:
-            # Regular message, send to AI
+        if not user_input.startswith("/"):
             chat.send_message(user_input, cmd_handlers.history)
             chat_manager.save_chat(cmd_handlers.current_chat, cmd_handlers.history)
+            continue
+
+        parts = user_input.strip().split(" ")
+        command_name = parts[0]
+        args = parts[1:]
+
+        command = cmd_registry.get_command(command_name)
+
+        if command:
+            try:
+                if command_name == "/exit":
+                    if not cmd_registry.execute_command(command_name, *args):
+                        break
+                else:
+                    cmd_registry.execute_command(command_name, *args)
+            except Exception as e:
+                print(f"Error executing command: {e}")
+        else:
+            print(f"Command '{command_name}' does not exist. Type /help to see available commands.")
 
 
 if __name__ == "__main__":

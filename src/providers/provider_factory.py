@@ -78,7 +78,7 @@ class ProviderRegistry:
         
         # Look for Python files in the providers directory
         for filename in os.listdir(providers_dir):
-            if filename.endswith('.py') and not filename.startswith('_') and filename != 'base_provider.py':
+            if filename.endswith('.py') and not filename.startswith('_') and filename not in ['base_provider.py', 'base_openai_provider.py']:
                 module_name = filename[:-3]  # Remove .py extension
                 
                 try:
